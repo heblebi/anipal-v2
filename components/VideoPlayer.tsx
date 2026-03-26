@@ -2,11 +2,12 @@ import React, { useState } from 'react';
 import { Play, Loader2 } from 'lucide-react';
 
 interface VideoPlayerProps {
-  embedUrl: string; // Can be a URL string or a full HTML string
+  embedUrl: string;
   poster?: string;
+  onPlay?: () => void;
 }
 
-const VideoPlayer: React.FC<VideoPlayerProps> = ({ embedUrl, poster }) => {
+const VideoPlayer: React.FC<VideoPlayerProps> = ({ embedUrl, poster, onPlay }) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -20,6 +21,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ embedUrl, poster }) => {
 
   const handlePlay = () => {
     setIsPlaying(true);
+    onPlay?.();
   };
 
   const handleIframeLoad = () => {

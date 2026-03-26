@@ -1,5 +1,6 @@
 export enum UserRole {
   USER = 'user',
+  EDITOR = 'editor',
   MODERATOR = 'moderator',
   ADMIN = 'admin',
 }
@@ -20,9 +21,14 @@ export interface Achievement {
   description: string;
   xpReward: number;
   icon: string; // Emoji or icon name
-  conditionType: 'COMMENT_COUNT' | 'WATCH_COUNT' | 'LIST_COUNT' | 'LEVEL_REACHED';
+  conditionType: 'COMMENT_COUNT' | 'WATCH_COUNT' | 'LIST_COUNT' | 'LEVEL_REACHED' | 'LIST_CREATED_COUNT';
   conditionValue: number;
   rarity?: 'common' | 'rare' | 'epic' | 'legendary';
+}
+
+export interface NewsLink {
+  label: string;
+  url: string;
 }
 
 export interface NewsItem {
@@ -33,6 +39,9 @@ export interface NewsItem {
   image: string;
   category: string;
   createdAt: string;
+  status: 'pending' | 'published';
+  authorId: string;
+  links?: NewsLink[];
 }
 
 export interface User {
@@ -47,13 +56,27 @@ export interface User {
   watchedEpisodes?: string[]; 
   likedEpisodes?: string[];
   watchlist?: string[]; // Anime IDs
+  animeList?: AnimeEntry[];
+  showAnimeList?: boolean;
+  customLists?: UserList[];
   isBanned?: boolean;
   createdAt?: string;
   // XP & Level System
   xp: number;
   level: number;
   earnedAchievements: string[]; // Achievement IDs
+  displayedBadges?: string[]; // Up to 5 badge IDs shown on profile
   notifications: Notification[];
+}
+
+export interface VideoSource {
+  name: string;
+  url: string;
+}
+
+export interface FansubGroup {
+  name: string;
+  sources: VideoSource[];
 }
 
 export interface Episode {
@@ -61,8 +84,11 @@ export interface Episode {
   number: number;
   title: string;
   videoUrl: string;
+  sources?: VideoSource[];
+  fansubs?: FansubGroup[];
   likes: number;
   fansub?: string;
+  thumbnail?: string;
 }
 
 export enum AnimeStatus {
@@ -83,6 +109,7 @@ export interface Anime {
   averageRating?: number;
   ratingsCount?: number;
   createdAt: string;
+  characters?: AnimeCharacter[];
 }
 
 export interface Comment {
@@ -93,6 +120,35 @@ export interface Comment {
   content: string;
   isSpoiler: boolean;
   createdAt: string;
+}
+
+export enum AnimeWatchStatus {
+  WATCHING = 'watching',
+  COMPLETED = 'completed',
+  PLAN_TO_WATCH = 'plan_to_watch',
+}
+
+export interface AnimeEntry {
+  animeId: string;
+  status: AnimeWatchStatus;
+  rating?: number; // 1-10
+  review?: string;
+  updatedAt: string;
+}
+
+export interface UserList {
+  id: string;
+  name: string;
+  isPublic: boolean;
+  animeIds: string[];
+  createdAt: string;
+}
+
+export interface AnimeCharacter {
+  id: number;
+  name: string;
+  image: string;
+  role: 'MAIN' | 'SUPPORTING';
 }
 
 export interface AuthResponse {

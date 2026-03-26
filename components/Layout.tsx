@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import Button from './Button';
 import { UserRole, Notification } from '../types';
-import { Cat, LogOut, Menu, X, Settings, User as UserIcon, Compass, Search, Trophy, Bell, Newspaper } from 'lucide-react';
+import { Cat, LogOut, Menu, X, Settings, User as UserIcon, Compass, Search, Trophy, Bell, Newspaper, ChevronDown } from 'lucide-react';
 import { getNotifications, markNotificationsAsRead } from '../services/mockBackend';
 
 const Layout = ({ children }: { children?: React.ReactNode }) => {
@@ -15,6 +15,10 @@ const Layout = ({ children }: { children?: React.ReactNode }) => {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [showNotifs, setShowNotifs] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
+
+  // Profile dropdown
+  const [showProfileMenu, setShowProfileMenu] = useState(false);
+  const profileMenuRef = useRef<HTMLDivElement>(null);
 
   const location = useLocation();
 
@@ -39,7 +43,19 @@ const Layout = ({ children }: { children?: React.ReactNode }) => {
 
   const handleLogout = () => {
     logoutUser();
+    setShowProfileMenu(false);
   };
+
+  // Close profile menu on outside click
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (profileMenuRef.current && !profileMenuRef.current.contains(e.target as Node)) {
+        setShowProfileMenu(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
 
   const handleNotifClick = async () => {
       setShowNotifs(!showNotifs);
@@ -100,9 +116,9 @@ const Layout = ({ children }: { children?: React.ReactNode }) => {
 
                        {/* Dropdown */}
                        {showNotifs && (
-                           <div className="absolute right-0 mt-2 w-80 bg-[#18181b] border border-gray-800 rounded-xl shadow-2xl overflow-hidden animate-in fade-in slide-in-from-top-2">
+                           <div className="absolute right-0 mt-2 w-[calc(100vw-2rem)] max-w-sm bg-[#18181b] border border-gray-800 rounded-xl shadow-2xl overflow-hidden animate-in fade-in slide-in-from-top-2">
                                <div className="p-3 border-b border-gray-800 font-bold text-sm text-gray-300">Bildirimler</div>
-                               <div className="max-h-64 overflow-y-auto custom-scrollbar">
+                               <div className="max-h-72 overflow-y-auto custom-scrollbar">
                                    {notifications.length > 0 ? (
                                        notifications.map(notif => (
                                            <div key={notif.id} className={`p-3 border-b border-gray-800/50 hover:bg-gray-800 transition-colors ${!notif.isRead ? 'bg-amber-500/5' : ''}`}>
@@ -129,17 +145,54 @@ const Layout = ({ children }: { children?: React.ReactNode }) => {
                        )}
                    </div>
 
-                   <div className="relative group">
-                      <Link to="/profile" className="flex items-center gap-2">
-                        <img src={user.avatar} alt="" className="w-8 h-8 rounded-full border border-gray-700" />
+                   <div className="relative" ref={profileMenuRef}>
+                      <button
+                        onClick={() => setShowProfileMenu(v => !v)}
+                        className="flex items-center gap-2 hover:opacity-80 transition-opacity"
+                      >
+                        <img
+                          src={user.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.username}`}
+                          alt=""
+                          className="w-8 h-8 rounded-full border border-gray-700 object-cover"
+                        />
                         <div className="hidden lg:flex flex-col text-left">
                             <span className="text-xs font-bold text-white">{user.username}</span>
                             <span className="text-[10px] text-amber-500 font-bold">Lvl {user.level}</span>
                         </div>
-                      </Link>
+                        <ChevronDown size={14} className={`text-gray-400 transition-transform hidden lg:block ${showProfileMenu ? 'rotate-180' : ''}`} />
+                      </button>
+
+                      {showProfileMenu && (
+                        <div className="absolute right-0 mt-3 w-48 bg-[#18181b] border border-gray-800 rounded-xl shadow-2xl overflow-hidden animate-in fade-in slide-in-from-top-2 z-50">
+                          <div className="p-3 border-b border-gray-800">
+                            <p className="text-xs font-bold text-white truncate">{user.username}</p>
+                            <p className="text-[10px] text-amber-500">Seviye {user.level} · {user.xp} XP</p>
+                          </div>
+                          <Link
+                            to="/profile"
+                            onClick={() => setShowProfileMenu(false)}
+                            className="flex items-center gap-3 px-4 py-3 text-sm text-gray-300 hover:bg-gray-800 hover:text-white transition-colors"
+                          >
+                            <UserIcon size={15} /> Profil
+                          </Link>
+                          <Link
+                            to="/settings"
+                            onClick={() => setShowProfileMenu(false)}
+                            className="flex items-center gap-3 px-4 py-3 text-sm text-gray-300 hover:bg-gray-800 hover:text-white transition-colors"
+                          >
+                            <Settings size={15} /> Ayarlar
+                          </Link>
+                          <div className="border-t border-gray-800">
+                            <button
+                              onClick={handleLogout}
+                              className="w-full flex items-center gap-3 px-4 py-3 text-sm text-red-400 hover:bg-red-900/20 hover:text-red-300 transition-colors"
+                            >
+                              <LogOut size={15} /> Çıkış Yap
+                            </button>
+                          </div>
+                        </div>
+                      )}
                    </div>
-                   
-                   <Button variant="ghost" onClick={handleLogout} title="Çıkış" className="p-2"><LogOut size={18} /></Button>
                 </div>
               ) : (
                 <>
@@ -151,9 +204,17 @@ const Layout = ({ children }: { children?: React.ReactNode }) => {
               )}
             </div>
 
-            {/* Mobile menu button */}
-            <div className="md:hidden flex items-center">
-              <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="text-white p-2">
+            {/* Mobile: bell + menu */}
+            <div className="md:hidden flex items-center gap-1">
+              {isAuthenticated && user && (
+                <button onClick={handleNotifClick} className="relative p-3 text-gray-300 hover:text-white">
+                  <Bell size={20} />
+                  {unreadCount > 0 && (
+                    <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full animate-pulse border border-[#0f0f10]"></span>
+                  )}
+                </button>
+              )}
+              <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="text-white p-3">
                 {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
               </button>
             </div>
@@ -163,20 +224,53 @@ const Layout = ({ children }: { children?: React.ReactNode }) => {
         {/* Mobile Menu */}
         {isMobileMenuOpen && (
           <div className="md:hidden bg-[#18181b] border-b border-gray-800 animate-in slide-in-from-top-5 duration-200 absolute w-full">
-            <div className="px-4 pt-4 pb-8 space-y-4">
-              <Link to="/" className="block text-lg font-bold text-white">Ana Sayfa</Link>
-              <Link to="/news" className="block text-lg font-bold text-gray-400">Haberler</Link>
-              <Link to="/explore" className="block text-lg font-bold text-gray-400">Keşfet</Link>
-              <Link to="/leaderboard" className="block text-lg font-bold text-amber-500">Sıralama</Link>
-              <hr className="border-gray-800" />
-              {isAuthenticated ? (
+            <div className="px-5 pt-4 pb-6 space-y-1">
+              {[
+                { to: '/', label: 'Ana Sayfa' },
+                { to: '/news', label: 'Haberler' },
+                { to: '/explore', label: 'Keşfet' },
+                { to: '/leaderboard', label: 'Sıralama' },
+              ].map(({ to, label }) => (
+                <Link key={to} to={to} onClick={() => setIsMobileMenuOpen(false)}
+                  className={`flex items-center py-3 text-base font-bold border-b border-gray-800 ${location.pathname === to ? 'text-amber-500' : 'text-gray-300'}`}
+                >{label}</Link>
+              ))}
+              <div className="pt-2">
+                {isAuthenticated && user ? (
                   <>
-                     <Link to="/profile" className="block text-gray-300">Profilim (Lvl {user?.level})</Link>
-                     <button onClick={handleLogout} className="text-red-400">Çıkış Yap</button>
+                    {(user.role === UserRole.ADMIN || user.role === UserRole.MODERATOR) && (
+                      <Link to="/admin" onClick={() => setIsMobileMenuOpen(false)}
+                        className="flex items-center py-3 text-base font-bold text-amber-500 border-b border-gray-800"
+                      >Yönetim</Link>
+                    )}
+                    <Link to="/profile" onClick={() => setIsMobileMenuOpen(false)}
+                      className="flex items-center gap-3 py-3 border-b border-gray-800"
+                    >
+                      <img src={user.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.username}`}
+                        className="w-9 h-9 rounded-full border border-gray-700 object-cover" alt="" />
+                      <div>
+                        <div className="text-white font-bold text-sm">{user.username}</div>
+                        <div className="text-amber-500 text-xs">Seviye {user.level}</div>
+                      </div>
+                    </Link>
+                    <Link to="/settings" onClick={() => setIsMobileMenuOpen(false)}
+                      className="flex items-center gap-2 py-3 text-gray-400 border-b border-gray-800 text-sm"
+                    ><Settings size={16} /> Ayarlar</Link>
+                    <button onClick={handleLogout}
+                      className="flex items-center gap-2 py-3 text-red-400 text-sm font-bold w-full"
+                    ><LogOut size={16} /> Çıkış Yap</button>
                   </>
-              ) : (
-                  <Link to="/login" className="block text-amber-500 font-bold">Giriş Yap</Link>
-              )}
+                ) : (
+                  <div className="flex gap-3 pt-2">
+                    <Link to="/login" onClick={() => setIsMobileMenuOpen(false)}
+                      className="flex-1 text-center py-3 text-sm font-bold text-gray-300 border border-gray-700 rounded-xl"
+                    >Giriş Yap</Link>
+                    <Link to="/register" onClick={() => setIsMobileMenuOpen(false)}
+                      className="flex-1 text-center py-3 text-sm font-bold text-black bg-amber-500 rounded-xl"
+                    >Kayıt Ol</Link>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         )}
@@ -189,7 +283,7 @@ const Layout = ({ children }: { children?: React.ReactNode }) => {
 
       {/* Footer */}
       <footer className="border-t border-gray-800 bg-[#0f0f10] py-12">
-        <div className="max-w-7xl mx-auto px-4 grid grid-cols-1 md:grid-cols-4 gap-8">
+        <div className="max-w-7xl mx-auto px-4 grid grid-cols-2 md:grid-cols-4 gap-8">
             <div className="col-span-1 md:col-span-2">
                 <span className="text-xl font-black text-white tracking-tighter mb-4 block">ANIPAL</span>
                 <p className="text-gray-500 text-sm max-w-xs">En sevdiğiniz animeleri yüksek kalitede, reklamsız ve kesintisiz izleyin.</p>

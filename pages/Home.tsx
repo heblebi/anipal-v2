@@ -54,7 +54,7 @@ const Home = () => {
       <NewsSlider news={news} />
 
       {/* Main Content Container */}
-      <div className="relative z-20 space-y-12 pl-4 md:pl-12 overflow-hidden pt-8">
+      <div className="relative z-20 space-y-10 sm:space-y-12 pl-3 sm:pl-4 md:pl-12 overflow-hidden pt-6 sm:pt-8">
         
         {/* Continue Watching */}
         {user && continueWatching.length > 0 && (
@@ -89,15 +89,15 @@ const Home = () => {
         </Section>
 
         {/* Explore CTA */}
-        <div className="pr-4 md:pr-12 mt-10">
-            <div className="bg-gradient-to-r from-gray-900 to-gray-800 rounded-2xl p-8 md:p-12 flex flex-col md:flex-row items-center justify-between border border-gray-700/50">
-                <div className="mb-6 md:mb-0">
-                    <h3 className="text-2xl font-bold text-white mb-2">Hala ne izleyeceğini bulamadın mı?</h3>
-                    <p className="text-gray-400">Binlerce anime arasından zevkine uygun olanı keşfet.</p>
+        <div className="pr-3 sm:pr-4 md:pr-12 mt-6 sm:mt-10">
+            <div className="bg-gradient-to-r from-gray-900 to-gray-800 rounded-2xl p-5 sm:p-8 md:p-12 flex flex-col sm:flex-row items-center justify-between gap-5 border border-gray-700/50 text-center sm:text-left">
+                <div>
+                    <h3 className="text-lg sm:text-2xl font-bold text-white mb-1 sm:mb-2">Hala ne izleyeceğini bulamadın mı?</h3>
+                    <p className="text-gray-400 text-sm sm:text-base">Binlerce anime arasından zevkine uygun olanı keşfet.</p>
                 </div>
-                <Link to="/explore">
-                    <button className="bg-amber-500 hover:bg-amber-600 text-black px-8 py-3 rounded-full font-bold flex items-center gap-2 transition-transform hover:scale-105">
-                        <Compass size={20} /> Keşfetmeye Başla
+                <Link to="/explore" className="flex-shrink-0">
+                    <button className="bg-amber-500 hover:bg-amber-600 text-black px-6 sm:px-8 py-3 rounded-full font-bold flex items-center gap-2 transition-transform hover:scale-105 whitespace-nowrap">
+                        <Compass size={18} /> Keşfetmeye Başla
                     </button>
                 </Link>
             </div>
@@ -117,12 +117,12 @@ interface SectionProps {
 }
 
 const Section = ({ title, children, linkTo, highlight }: SectionProps) => (
-    <div className="space-y-4">
-        <div className="flex items-end justify-between pr-4 md:pr-12">
-            <h2 className={`text-xl md:text-2xl font-bold ${highlight ? 'text-amber-500' : 'text-gray-100'}`}>{title}</h2>
-            {linkTo && <Link to={linkTo} className="text-xs text-gray-400 hover:text-white uppercase font-bold tracking-widest">Tümünü Gör</Link>}
+    <div className="space-y-3 sm:space-y-4">
+        <div className="flex items-center justify-between pr-3 sm:pr-4 md:pr-12">
+            <h2 className={`text-base sm:text-xl md:text-2xl font-bold ${highlight ? 'text-amber-500' : 'text-gray-100'}`}>{title}</h2>
+            {linkTo && <Link to={linkTo} className="text-xs text-gray-400 hover:text-white uppercase font-bold tracking-widest flex-shrink-0 ml-4">Tümü</Link>}
         </div>
-        <div className="flex gap-4 overflow-x-auto pb-8 pt-4 scrollbar-hide snap-x pr-4 md:pr-12 mask-image-right">
+        <div className="flex gap-3 sm:gap-4 overflow-x-auto pb-6 pt-2 scrollbar-hide snap-x pr-3 sm:pr-4 md:pr-12">
             {children}
         </div>
     </div>

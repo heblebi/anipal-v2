@@ -79,7 +79,7 @@ const NewsSlider: React.FC<NewsSliderProps> = ({ news }) => {
                     <p className="text-gray-200 text-sm md:text-lg mb-6 max-w-2xl line-clamp-2 drop-shadow-md">
                         {item.excerpt}
                     </p>
-                    <Link to="/news">
+                    <Link to={`/news/${item.id}`}>
                         <button className="bg-white text-black px-6 py-3 rounded font-bold hover:bg-gray-200 transition-colors flex items-center gap-2">
                             <Newspaper size={18} /> Haberi Oku
                         </button>
