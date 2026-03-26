@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { User } from '../types';
+import { supabase } from '../services/supabase';
 import { getCurrentUser, logout as apiLogout } from '../services/mockBackend';
 
 interface AuthContextType {
@@ -18,25 +19,26 @@ export const AuthProvider = ({ children }: { children?: ReactNode }) => {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Check for persisted session on mount
-    const checkAuth = async () => {
-      try {
-        const currentUser = getCurrentUser();
-        if (currentUser) {
-          setUser(currentUser);
-        }
-      } catch (error) {
-        console.error("Auth restoration failed", error);
-      } finally {
-        setIsLoading(false);
+    // İlk yüklemede mevcut oturumu kontrol et
+    getCurrentUser().then(u => {
+      setUser(u);
+      setIsLoading(false);
+    }).catch(() => setIsLoading(false));
+
+    // Supabase auth değişikliklerini dinle (login/logout/token refresh)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event) => {
+      if (event === 'SIGNED_OUT') {
+        setUser(null);
+      } else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+        const u = await getCurrentUser();
+        setUser(u);
       }
-    };
-    checkAuth();
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
 
-  const loginUser = (userData: User) => {
-    setUser(userData);
-  };
+  const loginUser = (userData: User) => setUser(userData);
 
   const logoutUser = async () => {
     await apiLogout();
@@ -48,14 +50,7 @@ export const AuthProvider = ({ children }: { children?: ReactNode }) => {
   };
 
   return (
-    <AuthContext.Provider value={{
-      user,
-      isAuthenticated: !!user,
-      isLoading,
-      loginUser,
-      logoutUser,
-      updateUser
-    }}>
+    <AuthContext.Provider value={{ user, isAuthenticated: !!user, isLoading, loginUser, logoutUser, updateUser }}>
       {children}
     </AuthContext.Provider>
   );
@@ -63,8 +58,6 @@ export const AuthProvider = ({ children }: { children?: ReactNode }) => {
 
 export const useAuth = () => {
   const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
+  if (context === undefined) throw new Error('useAuth must be used within an AuthProvider');
   return context;
 };
