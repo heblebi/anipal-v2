@@ -11,6 +11,7 @@ import NewsDetailPage from './pages/NewsDetailPage';
 import AdminDashboard from './pages/AdminDashboard';
 import AdminLogin from './pages/AdminLogin';
 import AddAnimePage from './pages/AddAnimePage';
+import ManagePanel from './pages/ManagePanel';
 import AnimePage from './pages/AnimePage';
 import Settings from './pages/Settings';
 import Profile from './pages/Profile';
@@ -57,6 +58,13 @@ const AppRoutes = () => {
       <Route path="/admin" element={<AdminLogin />} />
       <Route path="/admin/dashboard" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
       <Route path="/admin/add-anime" element={<AdminRoute><AddAnimePage /></AdminRoute>} />
+
+      {/* Moderatör / Editör paneli */}
+      <Route path="/panel" element={
+        <ProtectedRoute requireRole={[UserRole.MODERATOR, UserRole.EDITOR]}>
+          <ManagePanel />
+        </ProtectedRoute>
+      } />
 
       {/* Eski /add-anime linkini admin'e yönlendir */}
       <Route path="/add-anime" element={<Navigate to="/admin/add-anime" />} />

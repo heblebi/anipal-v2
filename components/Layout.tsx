@@ -99,9 +99,14 @@ const Layout = ({ children }: { children?: React.ReactNode }) => {
               
               {isAuthenticated && user ? (
                 <div className="flex items-center space-x-4">
-                   {(user.role === UserRole.ADMIN || user.role === UserRole.MODERATOR) && (
+                   {user.role === UserRole.ADMIN && (
                     <Link to="/admin">
                         <Button variant="secondary" className="px-3 py-1.5 text-xs h-8">Yönetim</Button>
+                    </Link>
+                   )}
+                   {(user.role === UserRole.MODERATOR || user.role === UserRole.EDITOR) && (
+                    <Link to="/panel">
+                        <Button variant="secondary" className="px-3 py-1.5 text-xs h-8">Panel</Button>
                     </Link>
                    )}
 
@@ -238,10 +243,15 @@ const Layout = ({ children }: { children?: React.ReactNode }) => {
               <div className="pt-2">
                 {isAuthenticated && user ? (
                   <>
-                    {(user.role === UserRole.ADMIN || user.role === UserRole.MODERATOR) && (
+                    {user.role === UserRole.ADMIN && (
                       <Link to="/admin" onClick={() => setIsMobileMenuOpen(false)}
                         className="flex items-center py-3 text-base font-bold text-amber-500 border-b border-gray-800"
                       >Yönetim</Link>
+                    )}
+                    {(user.role === UserRole.MODERATOR || user.role === UserRole.EDITOR) && (
+                      <Link to="/panel" onClick={() => setIsMobileMenuOpen(false)}
+                        className="flex items-center py-3 text-base font-bold text-amber-500 border-b border-gray-800"
+                      >Panel</Link>
                     )}
                     <Link to="/profile" onClick={() => setIsMobileMenuOpen(false)}
                       className="flex items-center gap-3 py-3 border-b border-gray-800"
