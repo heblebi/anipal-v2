@@ -386,7 +386,7 @@ const AdminDashboard = () => {
           {!isEditor && (
             <>
               <button
-                onClick={() => navigate('/add-anime')}
+                onClick={() => navigate('/admin/add-anime')}
                 className="flex items-center gap-2 px-4 py-3 font-medium text-sm text-gray-400 hover:text-amber-500 border-b-2 border-transparent transition-colors"
               >
                 <PlaySquare size={18}/> Anime Ekle

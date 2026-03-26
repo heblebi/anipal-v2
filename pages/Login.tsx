@@ -68,10 +68,6 @@ const Login = () => {
           </Link>
         </p>
 
-        <div className="mt-8 pt-6 border-t border-gray-800 text-xs text-center text-gray-600">
-           <p>Demo Admin Bilgileri:</p>
-           <p className="font-mono mt-1 text-amber-500/70">Kullanıcı: heblebi | Şifre: 123456</p>
-        </div>
       </div>
     </div>
   );

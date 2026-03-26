@@ -1,5 +1,59 @@
-import { supabase } from './supabase';
+import { supabase, USE_SUPABASE } from './supabase';
 import { Anime, AuthResponse, User, UserRole, Episode, Comment, AnimeStatus, SiteStats, Notification, Achievement, NewsItem, AnimeEntry, UserList, VideoSource } from '../types';
+
+// ─── localStorage backend (test/demo mode) ───────────────────────────────────
+
+const LS = {
+    get: (key: string) => { try { return JSON.parse(localStorage.getItem(key) || 'null'); } catch { return null; } },
+    set: (key: string, val: any) => localStorage.setItem(key, JSON.stringify(val)),
+    del: (key: string) => localStorage.removeItem(key),
+};
+
+const DEMO_USER_ID = 'demo-user-1';
+const LS_SESSION = 'anipal_ls_session';
+const LS_USERS   = 'anipal_ls_users';
+const LS_ANIMES  = 'anipal_ls_animes';
+
+const ensureDemoUsers = () => {
+    const users = LS.get(LS_USERS) || [];
+    if (!users.find((u: any) => u.username === 'demo')) {
+        users.push({ id: DEMO_USER_ID, username: 'demo', email: 'demo@anipal.app', password: 'demo123', role: 'user', avatar: '', bio: 'Demo kullanıcısı', xp: 0, level: 1, isBanned: false, showAnimeList: true, watchlist: [], watchedEpisodes: [], likedEpisodes: [], animeList: [], customLists: [], earnedAchievements: [], displayedBadges: [], notifications: [], createdAt: new Date().toISOString() });
+        LS.set(LS_USERS, users);
+    }
+    return LS.get(LS_USERS) as any[];
+};
+
+const lsGetUser = (id: string): any => (ensureDemoUsers()).find((u: any) => u.id === id) || null;
+
+const lsSaveUser = (user: any) => {
+    const users = ensureDemoUsers();
+    const idx = users.findIndex((u: any) => u.id === user.id);
+    if (idx !== -1) users[idx] = user; else users.push(user);
+    LS.set(LS_USERS, users);
+};
+
+const lsMapUser = (u: any): User => ({
+    id: u.id, username: u.username, email: u.email, role: u.role as UserRole,
+    avatar: u.avatar || '', coverImage: u.coverImage || '', bio: u.bio || '',
+    xp: u.xp || 0, level: u.level || 1, isBanned: u.isBanned || false,
+    showAnimeList: u.showAnimeList !== false, watchlist: u.watchlist || [],
+    watchedEpisodes: u.watchedEpisodes || [], likedEpisodes: u.likedEpisodes || [],
+    animeList: u.animeList || [], customLists: u.customLists || [],
+    earnedAchievements: u.earnedAchievements || [], displayedBadges: u.displayedBadges || [],
+    notifications: u.notifications || [], createdAt: u.createdAt,
+});
+
+const SEED_ANIMES: Anime[] = [
+    { id: 'seed-1', title: 'Naruto', description: 'Ninja dünyasında geçen macera serisi.', coverImage: 'https://cdn.myanimelist.net/images/anime/13/17405.jpg', bannerImage: '', genres: ['Aksiyon', 'Macera'], episodes: [], status: 'approved' as AnimeStatus, uploadedBy: 'system', averageRating: 4.5, ratingsCount: 1200, characters: [], createdAt: new Date().toISOString() },
+    { id: 'seed-2', title: 'Attack on Titan', description: 'İnsanlığın devlere karşı mücadelesi.', coverImage: 'https://cdn.myanimelist.net/images/anime/10/47347.jpg', bannerImage: '', genres: ['Aksiyon', 'Drama'], episodes: [], status: 'approved' as AnimeStatus, uploadedBy: 'system', averageRating: 4.9, ratingsCount: 2500, characters: [], createdAt: new Date().toISOString() },
+    { id: 'seed-3', title: 'Death Note', description: 'Bir not defteri ile dünyayı değiştirmeye çalışan bir deha.', coverImage: 'https://cdn.myanimelist.net/images/anime/9/9453.jpg', bannerImage: '', genres: ['Gerilim', 'Psikolojik'], episodes: [], status: 'approved' as AnimeStatus, uploadedBy: 'system', averageRating: 4.7, ratingsCount: 3000, characters: [], createdAt: new Date().toISOString() },
+];
+
+const lsGetAnimes = (): Anime[] => {
+    const stored = LS.get(LS_ANIMES);
+    if (!stored || stored.length === 0) { LS.set(LS_ANIMES, SEED_ANIMES); return SEED_ANIMES; }
+    return stored;
+};
 
 // ─── Achievements (static, no DB) ───────────────────────────────────────────
 
@@ -164,6 +218,14 @@ const fetchProfile = async (id: string) => {
 // ─── Auth ─────────────────────────────────────────────────────────────────────
 
 export const login = async (emailOrUsername: string, password: string): Promise<AuthResponse> => {
+    if (!USE_SUPABASE) {
+        const users = ensureDemoUsers();
+        const u = users.find((x: any) => (x.username === emailOrUsername || x.email === emailOrUsername) && x.password === password);
+        if (!u) throw new Error('Geçersiz kullanıcı adı veya şifre');
+        if (u.isBanned) throw new Error('Bu hesap engellenmiştir.');
+        LS.set(LS_SESSION, u.id);
+        return { user: lsMapUser(u), token: 'ls-token' };
+    }
     let email = emailOrUsername;
     if (!emailOrUsername.includes('@')) {
         const { data, error } = await supabase.from('profiles').select('email').eq('username', emailOrUsername).single();
@@ -179,6 +241,14 @@ export const login = async (emailOrUsername: string, password: string): Promise<
 };
 
 export const register = async (username: string, email: string, password: string): Promise<AuthResponse> => {
+    if (!USE_SUPABASE) {
+        const users = ensureDemoUsers();
+        if (users.find((u: any) => u.username === username)) throw new Error('Bu kullanıcı adı zaten kullanımda');
+        const newUser = { id: `ls-user-${Date.now()}`, username, email, password, role: 'user', avatar: '', bio: '', xp: 0, level: 1, isBanned: false, showAnimeList: true, watchlist: [], watchedEpisodes: [], likedEpisodes: [], animeList: [], customLists: [], earnedAchievements: [], displayedBadges: [], notifications: [], createdAt: new Date().toISOString() };
+        lsSaveUser(newUser);
+        LS.set(LS_SESSION, newUser.id);
+        return { user: lsMapUser(newUser), token: 'ls-token' };
+    }
     const { data: existing } = await supabase.from('profiles').select('id').eq('username', username).single();
     if (existing) throw new Error('Bu kullanıcı adı zaten kullanımda');
     const { data, error } = await supabase.auth.signUp({ email, password, options: { data: { username } } });
@@ -191,9 +261,18 @@ export const register = async (username: string, email: string, password: string
     return { user, token: data.session?.access_token || '' };
 };
 
-export const logout = async () => { await supabase.auth.signOut(); };
+export const logout = async () => {
+    if (!USE_SUPABASE) { LS.del(LS_SESSION); return; }
+    await supabase.auth.signOut();
+};
 
 export const getCurrentUser = async (): Promise<User | null> => {
+    if (!USE_SUPABASE) {
+        const id = LS.get(LS_SESSION);
+        if (!id) return null;
+        const u = lsGetUser(id);
+        return u ? lsMapUser(u) : null;
+    }
     const { data: { session } } = await supabase.auth.getSession();
     if (!session?.user) return null;
     try {
@@ -316,6 +395,12 @@ export const getUserComments = async (userId: string) => {
 // ─── Animes ───────────────────────────────────────────────────────────────────
 
 export const getAnimes = async (filter?: { status?: AnimeStatus | null }): Promise<Anime[]> => {
+    if (!USE_SUPABASE) {
+        const all = lsGetAnimes();
+        if (filter === undefined) return all.filter(a => a.status === 'approved');
+        if (filter.status) return all.filter(a => a.status === filter.status);
+        return all;
+    }
     let query = supabase.from('animes').select('*').order('created_at', { ascending: false });
     if (filter === undefined) {
         query = query.eq('status', 'approved');
@@ -328,6 +413,7 @@ export const getAnimes = async (filter?: { status?: AnimeStatus | null }): Promi
 };
 
 export const getAnimeById = async (id: string): Promise<Anime | null> => {
+    if (!USE_SUPABASE) return lsGetAnimes().find(a => a.id === id) || null;
     const { data, error } = await supabase.from('animes').select('*').eq('id', id).single();
     if (error || !data) return null;
     return mapAnime(data);

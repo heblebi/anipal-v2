@@ -9,29 +9,29 @@ import Register from './pages/Register';
 import AnimeDetail from './pages/AnimeDetail';
 import NewsDetailPage from './pages/NewsDetailPage';
 import AdminDashboard from './pages/AdminDashboard';
+import AdminLogin from './pages/AdminLogin';
 import AddAnimePage from './pages/AddAnimePage';
 import AnimePage from './pages/AnimePage';
 import Settings from './pages/Settings';
 import Profile from './pages/Profile';
 import Leaderboard from './pages/Leaderboard';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { getAdminSession } from './services/adminAuth';
 import { UserRole } from './types';
 
-// Protected Route Wrapper
+// Normal kullanıcı korumalı rota
 const ProtectedRoute = ({ children, requireRole }: { children?: React.ReactNode, requireRole?: UserRole[] }) => {
   const { user, isAuthenticated, isLoading } = useAuth();
-
   if (isLoading) return null;
+  if (!isAuthenticated) return <Navigate to="/login" />;
+  if (requireRole && user && !requireRole.includes(user.role)) return <Navigate to="/" />;
+  return <>{children}</>;
+};
 
-  if (!isAuthenticated) {
-    return <Navigate to="/login" />;
-  }
-
-  // If roles are specified, check if user has one of them
-  if (requireRole && user && !requireRole.includes(user.role)) {
-    return <Navigate to="/" />;
-  }
-
+// Admin korumalı rota — normal kullanıcı sisteminden bağımsız
+const AdminRoute = ({ children }: { children: React.ReactNode }) => {
+  const session = getAdminSession();
+  if (!session) return <Navigate to="/admin" />;
   return <>{children}</>;
 };
 
@@ -47,28 +47,19 @@ const AppRoutes = () => {
       <Route path="/news/:id" element={<NewsDetailPage />} />
       <Route path="/anime/:id" element={<AnimePage />} />
       <Route path="/anime/:id/watch" element={<AnimeDetail />} />
-      
-      {/* Protected User Routes */}
+
+      {/* Kullanıcı korumalı rotalar */}
       <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
       <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
       <Route path="/profile/:userId" element={<Profile />} />
 
-      <Route
-        path="/admin"
-        element={
-          <ProtectedRoute requireRole={[UserRole.ADMIN, UserRole.MODERATOR, UserRole.EDITOR]}>
-            <AdminDashboard />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/add-anime"
-        element={
-          <ProtectedRoute requireRole={[UserRole.ADMIN, UserRole.MODERATOR]}>
-            <AddAnimePage />
-          </ProtectedRoute>
-        }
-      />
+      {/* Admin — ayrı giriş sistemi */}
+      <Route path="/admin" element={<AdminLogin />} />
+      <Route path="/admin/dashboard" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
+      <Route path="/admin/add-anime" element={<AdminRoute><AddAnimePage /></AdminRoute>} />
+
+      {/* Eski /add-anime linkini admin'e yönlendir */}
+      <Route path="/add-anime" element={<Navigate to="/admin/add-anime" />} />
     </Routes>
   );
 };

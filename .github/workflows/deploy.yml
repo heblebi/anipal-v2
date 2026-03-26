@@ -26,6 +26,9 @@ jobs:
 
       - name: Build
         run: npm run build
+        env:
+          VITE_BASE_PATH: /${{ github.event.repository.name }}/
+          VITE_USE_SUPABASE: ${{ github.event.repository.name == 'hebleani-test' && 'false' || 'true' }}
 
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v4
