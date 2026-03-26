@@ -17,7 +17,6 @@ import Settings from './pages/Settings';
 import Profile from './pages/Profile';
 import Leaderboard from './pages/Leaderboard';
 import { AuthProvider, useAuth } from './context/AuthContext';
-import { getAdminSession } from './services/adminAuth';
 import { UserRole } from './types';
 
 // Normal kullanıcı korumalı rota
@@ -29,12 +28,6 @@ const ProtectedRoute = ({ children, requireRole }: { children?: React.ReactNode,
   return <>{children}</>;
 };
 
-// Admin korumalı rota — normal kullanıcı sisteminden bağımsız
-const AdminRoute = ({ children }: { children: React.ReactNode }) => {
-  const session = getAdminSession();
-  if (!session) return <Navigate to="/admin" />;
-  return <>{children}</>;
-};
 
 const AppRoutes = () => {
   return (
@@ -54,10 +47,10 @@ const AppRoutes = () => {
       <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
       <Route path="/profile/:userId" element={<Profile />} />
 
-      {/* Admin — ayrı giriş sistemi */}
+      {/* Admin paneli — normal Supabase auth, ADMIN rolü gerekli */}
       <Route path="/admin" element={<AdminLogin />} />
-      <Route path="/admin/dashboard" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
-      <Route path="/admin/add-anime" element={<AdminRoute><AddAnimePage /></AdminRoute>} />
+      <Route path="/admin/dashboard" element={<ProtectedRoute requireRole={[UserRole.ADMIN]}><AdminDashboard /></ProtectedRoute>} />
+      <Route path="/admin/add-anime" element={<ProtectedRoute requireRole={[UserRole.ADMIN]}><AddAnimePage /></ProtectedRoute>} />
 
       {/* Moderatör / Editör paneli */}
       <Route path="/panel" element={

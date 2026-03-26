@@ -1,25 +1,39 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Shield, Eye, EyeOff, Loader2 } from 'lucide-react';
-import { adminLogin } from '../services/adminAuth';
+import { useAuth } from '../context/AuthContext';
+import { login } from '../services/mockBackend';
+import { UserRole } from '../types';
 
 const AdminLogin = () => {
   const navigate = useNavigate();
+  const { user, loginUser } = useAuth();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showPass, setShowPass] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
+  // Zaten admin olarak giriş yaptıysa direkt dashboard'a gönder
+  useEffect(() => {
+    if (user?.role === UserRole.ADMIN) {
+      navigate('/admin/dashboard');
+    }
+  }, [user]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setLoading(true);
     try {
-      adminLogin(username, password);
+      const { user: loggedIn } = await login(username, password);
+      if (loggedIn.role !== UserRole.ADMIN) {
+        throw new Error('Bu hesabın yönetici yetkisi yok.');
+      }
+      loginUser(loggedIn);
       navigate('/admin/dashboard');
     } catch (err: any) {
-      setError(err.message);
+      setError(err.message || 'Giriş başarısız.');
     } finally {
       setLoading(false);
     }

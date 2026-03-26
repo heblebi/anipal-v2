@@ -101,8 +101,9 @@ const AdminDashboard = () => {
   const [newsSaving, setNewsSaving] = useState(false);
 
   useEffect(() => {
-    if (!user || (user.role !== UserRole.ADMIN && user.role !== UserRole.MODERATOR && user.role !== UserRole.EDITOR)) {
+    if (!user || user.role !== UserRole.ADMIN) {
       navigate('/');
+      return;
     }
     loadData();
   }, [user, activeTab]);
