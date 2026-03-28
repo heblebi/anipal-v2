@@ -4,7 +4,8 @@ import { useAuth } from '../context/AuthContext';
 import { getUserById, getUserComments, updateUserProfile, getAllAchievements, getUserAnimeList, getAnimes, getUserLists, getPublicLists } from '../services/mockBackend';
 import { User, Comment, Achievement, AnimeEntry, AnimeWatchStatus, Anime, UserList } from '../types';
 import Button from '../components/Button';
-import { MessageSquare, PlayCircle, Heart, Edit2, Save, X, Upload, Camera, List, Globe, Lock } from 'lucide-react';
+import ImageCropModal from '../components/ImageCropModal';
+import { MessageSquare, PlayCircle, Heart, Edit2, Save, X, Upload, Camera, List, Globe, Lock, Crop } from 'lucide-react';
 
 const Profile = () => {
   const { userId } = useParams<{ userId: string }>();
@@ -33,6 +34,12 @@ const Profile = () => {
   const [editCover, setEditCover] = useState('');
   const [editDisplayedBadges, setEditDisplayedBadges] = useState<string[]>([]);
   const [saveLoading, setSaveLoading] = useState(false);
+
+  // Image upload / crop state
+  const [cropModal, setCropModal] = useState<{ src: string; type: 'avatar' | 'banner' } | null>(null);
+  const [editAvatarOriginal, setEditAvatarOriginal] = useState('');
+  const [editCoverOriginal, setEditCoverOriginal] = useState('');
+  const [uploadError, setUploadError] = useState<string | null>(null);
 
   // File Input Refs
   const avatarInputRef = useRef<HTMLInputElement>(null);
@@ -85,22 +92,67 @@ const Profile = () => {
     }
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, type: 'avatar' | 'cover') => {
-      const file = e.target.files?.[0];
-      if (!file) return;
+  const ALLOWED_MIME = ['image/jpeg', 'image/png', 'image/webp'];
 
-      if (file.size > 2 * 1024 * 1024) {
-          alert("Dosya boyutu çok büyük! Lütfen 2MB'dan küçük bir resim seçin.");
-          return;
-      }
+  const checkRateLimit = (t: 'avatar' | 'banner'): boolean => {
+    const key = `ul_rl_${t}`;
+    const now = Date.now();
+    const windowMs = 10 * 60 * 1000;
+    const max = 5;
+    const stored: number[] = JSON.parse(localStorage.getItem(key) || '[]');
+    const recent = stored.filter(ts => now - ts < windowMs);
+    if (recent.length >= max) return false;
+    recent.push(now);
+    localStorage.setItem(key, JSON.stringify(recent));
+    return true;
+  };
 
-      const reader = new FileReader();
-      reader.onloadend = () => {
-          const result = reader.result as string;
-          if (type === 'avatar') setEditAvatar(result);
-          if (type === 'cover') setEditCover(result);
-      };
-      reader.readAsDataURL(file);
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, type: 'avatar' | 'banner') => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+
+    setUploadError(null);
+
+    if (!ALLOWED_MIME.includes(file.type)) {
+      setUploadError('Sadece JPG, PNG ve WEBP formatları kabul edilir.');
+      return;
+    }
+
+    const maxSize = type === 'avatar' ? 1 * 1024 * 1024 : 3 * 1024 * 1024;
+    if (file.size > maxSize) {
+      setUploadError(`Dosya boyutu ${type === 'avatar' ? '1MB' : '3MB'} sınırını aşıyor.`);
+      return;
+    }
+
+    if (!checkRateLimit(type)) {
+      setUploadError('Çok fazla yükleme yaptınız. Lütfen 10 dakika bekleyin.');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const src = reader.result as string;
+      if (type === 'avatar') setEditAvatarOriginal(src);
+      else setEditCoverOriginal(src);
+      setCropModal({ src, type });
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleCropConfirm = (dataUrl: string) => {
+    if (cropModal?.type === 'avatar') setEditAvatar(dataUrl);
+    else setEditCover(dataUrl);
+    setCropModal(null);
+  };
+
+  const handleReCrop = (type: 'avatar' | 'banner') => {
+    const src =
+      type === 'avatar'
+        ? editAvatarOriginal || editAvatar
+        : editCoverOriginal || editCover;
+    if (!src) return;
+    setCropModal({ src, type });
   };
 
   const handleSaveProfile = async () => {
@@ -130,6 +182,23 @@ const Profile = () => {
   const currentLevel = profileUser.level || 1;
   const nextLevelXP = currentLevel * 100;
   const progressPercent = Math.min(100, ((currentXP % 100) / 100) * 100);
+
+  const getLevelStyle = (level: number): { bg: string; text: string; border: string; glow: string } => {
+    const tier = Math.floor((level - 1) / 5);
+    const styles = [
+      { bg: 'bg-violet-500/20', text: 'text-violet-300', border: 'border-violet-500/50', glow: '' },          // 1-5
+      { bg: 'bg-blue-500/20',   text: 'text-blue-300',   border: 'border-blue-500/50',   glow: '' },          // 6-10
+      { bg: 'bg-cyan-500/20',   text: 'text-cyan-300',   border: 'border-cyan-500/50',   glow: '' },          // 11-15
+      { bg: 'bg-emerald-500/20',text: 'text-emerald-300',border: 'border-emerald-500/50',glow: '' },          // 16-20
+      { bg: 'bg-amber-500/20',  text: 'text-amber-300',  border: 'border-amber-500/50',  glow: '' },          // 21-25
+      { bg: 'bg-orange-500/20', text: 'text-orange-300', border: 'border-orange-500/50', glow: '' },          // 26-30
+      { bg: 'bg-rose-500/20',   text: 'text-rose-300',   border: 'border-rose-500/50',   glow: '' },          // 31-35
+      { bg: 'bg-pink-500/20',   text: 'text-pink-300',   border: 'border-pink-500/50',   glow: '' },          // 36-40
+      { bg: 'bg-fuchsia-500/20',text: 'text-fuchsia-300',border: 'border-fuchsia-500/50',glow: '' },         // 41-45
+      { bg: 'bg-yellow-400/20', text: 'text-yellow-200', border: 'border-yellow-400/60', glow: 'shadow-[0_0_8px_rgba(250,204,21,0.3)]' }, // 46-50
+    ];
+    return styles[Math.min(tier, styles.length - 1)];
+  };
 
   const getRarityClass = (rarity: string = 'common') => {
       switch(rarity) {
@@ -182,6 +251,24 @@ const Profile = () => {
 
   return (
     <div className="animate-in fade-in duration-500 pb-10">
+      {cropModal && (
+        <ImageCropModal
+          imageSrc={cropModal.src}
+          type={cropModal.type}
+          onConfirm={handleCropConfirm}
+          onCancel={() => setCropModal(null)}
+        />
+      )}
+
+      {/* Upload error toast */}
+      {uploadError && (
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[9999] w-full max-w-md px-4">
+          <div className="bg-red-900 border border-red-700 rounded-xl px-4 py-3 text-red-200 text-sm font-medium flex items-center justify-between shadow-2xl">
+            <span>{uploadError}</span>
+            <button onClick={() => setUploadError(null)} className="text-red-400 hover:text-white ml-4 flex-shrink-0"><X size={16} /></button>
+          </div>
+        </div>
+      )}
 
       {/* Header / Cover */}
       <div className="relative h-36 sm:h-48 md:h-64 rounded-xl overflow-hidden bg-gray-800 border border-gray-800 group">
@@ -197,18 +284,27 @@ const Profile = () => {
                 <input
                     type="file"
                     ref={coverInputRef}
-                    onChange={(e) => handleFileChange(e, 'cover')}
-                    accept="image/*"
+                    onChange={(e) => handleFileChange(e, 'banner')}
+                    accept=".jpg,.jpeg,.png,.webp"
                     className="hidden"
                 />
-                <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+                <div className="absolute inset-0 bg-black/40 flex items-center justify-center gap-3">
                     <button
                         onClick={() => coverInputRef.current?.click()}
-                        className="bg-black/70 hover:bg-black text-white px-6 py-2 rounded-full backdrop-blur-sm border border-gray-600 flex items-center gap-2 transition-colors font-bold text-sm"
+                        className="bg-black/70 hover:bg-black text-white px-5 py-2 rounded-full backdrop-blur-sm border border-gray-600 flex items-center gap-2 transition-colors font-bold text-sm"
                     >
-                        <Camera size={18} /> Kapak Fotoğrafını Değiştir
+                        <Camera size={16} /> Yeni Fotoğraf
                     </button>
+                    {(editCoverOriginal || editCover) && (
+                        <button
+                            onClick={() => handleReCrop('banner')}
+                            className="bg-amber-500/80 hover:bg-amber-500 text-black px-5 py-2 rounded-full backdrop-blur-sm flex items-center gap-2 transition-colors font-bold text-sm"
+                        >
+                            <Crop size={16} /> Yeniden Kırp
+                        </button>
+                    )}
                 </div>
+                <p className="absolute bottom-2 right-3 text-xs text-gray-400 bg-black/60 px-2 py-1 rounded">Maks. 3MB · JPG PNG WEBP</p>
              </>
          )}
       </div>
@@ -230,22 +326,29 @@ const Profile = () => {
                             type="file"
                             ref={avatarInputRef}
                             onChange={(e) => handleFileChange(e, 'avatar')}
-                            accept="image/*"
+                            accept=".jpg,.jpeg,.png,.webp"
                             className="hidden"
                         />
                         <div
-                            className="absolute inset-0 bg-black/50 flex items-center justify-center cursor-pointer hover:bg-black/70 transition-colors"
+                            className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center cursor-pointer hover:bg-black/70 transition-colors gap-1"
                             onClick={() => avatarInputRef.current?.click()}
                         >
-                            <Upload size={24} className="text-white" />
+                            <Upload size={20} className="text-white" />
+                            <span className="text-white text-[10px] font-bold">Yükle</span>
                         </div>
                     </>
                 )}
 
-                <div className="absolute bottom-0 right-0 bg-amber-500 text-black font-black text-xs px-2 py-1 rounded-tl-lg z-10">
-                    LVL {currentLevel}
-                </div>
             </div>
+            {/* Re-crop button below avatar */}
+            {isOwnProfile && isEditing && (editAvatarOriginal || editAvatar) && (
+                <button
+                    onClick={() => handleReCrop('avatar')}
+                    className="mt-1 flex items-center gap-1 text-xs text-amber-400 hover:text-amber-300 font-bold transition-colors"
+                >
+                    <Crop size={12} /> Kırp
+                </button>
+            )}
          </div>
 
          {/* Name & Bio & XP Bar */}
@@ -257,6 +360,14 @@ const Profile = () => {
                         <span className="text-xs font-normal text-gray-500 bg-gray-900 border border-gray-700 px-2 py-0.5 rounded-full capitalize">
                             {profileUser.role}
                         </span>
+                        {(() => {
+                          const s = getLevelStyle(currentLevel);
+                          return (
+                            <span className={`text-xs font-bold px-2 py-0.5 rounded-full border ${s.bg} ${s.text} ${s.border} ${s.glow}`}>
+                              LVL {currentLevel}
+                            </span>
+                          );
+                        })()}
                     </h1>
                     {showcaseBadges.length > 0 && (
                         <div className="flex flex-wrap gap-1.5 mt-1.5">
@@ -294,7 +405,7 @@ const Profile = () => {
                                 <Button size="sm" onClick={handleSaveProfile} isLoading={saveLoading} className="text-xs h-8">
                                     <Save size={14} className="mr-1" /> Kaydet
                                 </Button>
-                                <Button size="sm" variant="secondary" onClick={() => { setIsEditing(false); setEditAvatar(profileUser.avatar || ''); setEditCover(profileUser.coverImage || ''); setEditDisplayedBadges(profileUser.displayedBadges || []); }} className="text-xs h-8 border-gray-700 hover:border-amber-500">
+                                <Button size="sm" variant="secondary" onClick={() => { setIsEditing(false); setEditAvatar(profileUser.avatar || ''); setEditCover(profileUser.coverImage || ''); setEditDisplayedBadges(profileUser.displayedBadges || []); setEditAvatarOriginal(''); setEditCoverOriginal(''); setUploadError(null); }} className="text-xs h-8 border-gray-700 hover:border-amber-500">
                                     <X size={14} className="mr-1" /> İptal
                                 </Button>
                             </div>

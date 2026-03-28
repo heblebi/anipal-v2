@@ -20,7 +20,12 @@ export const AuthProvider = ({ children }: { children?: ReactNode }) => {
 
   useEffect(() => {
     // İlk yüklemede mevcut oturumu kontrol et
-    getCurrentUser().then(u => {
+    getCurrentUser().then(async u => {
+      if (!u) {
+        // No user resolved — if a Supabase session still exists (orphan), clean it up
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session) await supabase.auth.signOut().catch(() => {});
+      }
       setUser(u);
       setIsLoading(false);
     }).catch(() => setIsLoading(false));
@@ -30,8 +35,10 @@ export const AuthProvider = ({ children }: { children?: ReactNode }) => {
       if (event === 'SIGNED_OUT') {
         setUser(null);
       } else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
-        const u = await getCurrentUser();
-        setUser(u);
+        try {
+          const u = await getCurrentUser();
+          if (u) setUser(u); // never override valid user with null
+        } catch { /* ignore */ }
       }
     });
 

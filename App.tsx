@@ -17,6 +17,7 @@ import Settings from './pages/Settings';
 import Profile from './pages/Profile';
 import Leaderboard from './pages/Leaderboard';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { SiteSettingsProvider } from './context/SiteSettingsContext';
 import { UserRole } from './types';
 
 // Normal kullanıcı korumalı rota
@@ -67,13 +68,15 @@ const AppRoutes = () => {
 
 const App = () => {
   return (
-    <AuthProvider>
-      <HashRouter>
-        <Layout>
-          <AppRoutes />
-        </Layout>
-      </HashRouter>
-    </AuthProvider>
+    <SiteSettingsProvider>
+      <AuthProvider>
+        <HashRouter>
+          <Layout>
+            <AppRoutes />
+          </Layout>
+        </HashRouter>
+      </AuthProvider>
+    </SiteSettingsProvider>
   );
 };
 

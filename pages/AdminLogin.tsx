@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Shield, Eye, EyeOff, Loader2 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { login } from '../services/mockBackend';
+import { supabase } from '../services/supabase';
 import { UserRole } from '../types';
 
 const AdminLogin = () => {
@@ -28,11 +29,14 @@ const AdminLogin = () => {
     try {
       const { user: loggedIn } = await login(username, password);
       if (loggedIn.role !== UserRole.ADMIN) {
+        await supabase.auth.signOut();
         throw new Error('Bu hesabın yönetici yetkisi yok.');
       }
       loginUser(loggedIn);
       navigate('/admin/dashboard');
     } catch (err: any) {
+      // Clean up any orphan Supabase session on failure
+      await supabase.auth.signOut().catch(() => {});
       setError(err.message || 'Giriş başarısız.');
     } finally {
       setLoading(false);

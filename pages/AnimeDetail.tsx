@@ -5,7 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import { Anime, Episode, VideoSource, FansubGroup, AnimeWatchStatus } from '../types';
 import VideoPlayer from '../components/VideoPlayer';
 import CommentSection from '../components/CommentSection';
-import { PlayCircle, List, Heart, MessageSquare, Plus, Check, Star, CheckCircle2, X, ChevronLeft } from 'lucide-react';
+import { PlayCircle, List, Heart, MessageSquare, Plus, Check, Star, CheckCircle2, X, ChevronLeft, ChevronRight } from 'lucide-react';
 import Button from '../components/Button';
 
 const AnimeDetail = () => {
@@ -273,8 +273,21 @@ const AnimeDetail = () => {
                 )}
             </div>
 
-            {selectedEpisode && (
-                <div className="bg-[#18181b] p-3 sm:p-4 rounded-xl border border-gray-800">
+            {selectedEpisode && (() => {
+                const sorted = [...anime.episodes].sort((a, b) => a.number - b.number);
+                const currentIdx = sorted.findIndex(e => e.id === selectedEpisode.id);
+                const prevEp = currentIdx > 0 ? sorted[currentIdx - 1] : null;
+                const nextEp = currentIdx < sorted.length - 1 ? sorted[currentIdx + 1] : null;
+                const goToEp = (ep: Episode) => {
+                    setSelectedEpisode(ep);
+                    const fansubs = getEpFansubs(ep);
+                    setSelectedFansubName(fansubs[0].name);
+                    setSelectedSource(fansubs[0].sources[0] || null);
+                    navigate(`/anime/${id}/watch?ep=${ep.id}`, { replace: true });
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                };
+                return (
+                <div className="bg-[#18181b] p-3 sm:p-4 rounded-xl border border-gray-800 space-y-3">
                     <div className="flex flex-wrap justify-between items-start gap-3">
                         <div className="min-w-0">
                             <h2 className="text-base sm:text-xl font-bold text-white leading-tight">{selectedEpisode.number}. Bölüm: {selectedEpisode.title}</h2>
@@ -300,8 +313,29 @@ const AnimeDetail = () => {
                             </Button>
                         </div>
                     </div>
+
+                    {/* Prev / Next Episode Buttons */}
+                    <div className="flex gap-2">
+                        <button
+                            onClick={() => prevEp && goToEp(prevEp)}
+                            disabled={!prevEp}
+                            className="flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg font-bold text-sm transition-all border border-gray-700 bg-gray-900 hover:bg-gray-800 hover:border-amber-500 hover:text-amber-500 disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:border-gray-700 disabled:hover:text-white"
+                        >
+                            <ChevronLeft size={16} />
+                            <span>{prevEp ? `${prevEp.number}. Bölüm` : 'Önceki Bölüm'}</span>
+                        </button>
+                        <button
+                            onClick={() => nextEp && goToEp(nextEp)}
+                            disabled={!nextEp}
+                            className="flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg font-bold text-sm transition-all border border-gray-700 bg-gray-900 hover:bg-gray-800 hover:border-amber-500 hover:text-amber-500 disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:border-gray-700 disabled:hover:text-white"
+                        >
+                            <span>{nextEp ? `${nextEp.number}. Bölüm` : 'Sonraki Bölüm'}</span>
+                            <ChevronRight size={16} />
+                        </button>
+                    </div>
                 </div>
-            )}
+                );
+            })()}
 
             {xpGranted && (
                 <div className="bg-amber-500/10 border border-amber-800/40 rounded-xl px-4 py-2 text-amber-400 text-sm font-bold flex items-center gap-2">

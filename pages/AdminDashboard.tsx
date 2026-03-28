@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { UserRole, Anime, User, AnimeStatus, SiteStats, NewsItem } from '../types';
 import { useNavigate } from 'react-router-dom';
@@ -15,7 +15,10 @@ interface EmbedResult {
   error?: string;
   url?: string;
 }
-import { Activity, Download, Users, CheckCircle, ShieldAlert, PlaySquare, Search, Shield, Plus, Trash2, Image, ChevronDown, ChevronRight, Pencil, X, Save, Globe, Loader2, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Activity, Download, Users, CheckCircle, ShieldAlert, PlaySquare, Search, Shield, Plus, Trash2, Image, ChevronDown, ChevronRight, Pencil, X, Save, Globe, Loader2, CheckCircle2, AlertCircle, ImageIcon, Upload } from 'lucide-react';
+import ImageCropModal from '../components/ImageCropModal';
+import { SITE_ASSETS, SiteAsset } from '../services/siteSettings';
+import { useSiteSettings } from '../context/SiteSettingsContext';
 
 interface SourceRow { id: string; name: string; url: string; }
 interface FansubRow { id: string; name: string; sources: SourceRow[]; }
@@ -30,7 +33,12 @@ const AdminDashboard = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const isEditor = user?.role === UserRole.EDITOR;
-  const [activeTab, setActiveTab] = useState<'stats' | 'episodes' | 'moderation' | 'users' | 'manage' | 'news'>(isEditor ? 'news' : 'stats');
+  const [activeTab, setActiveTab] = useState<'stats' | 'episodes' | 'moderation' | 'users' | 'manage' | 'news' | 'assets'>(isEditor ? 'news' : 'stats');
+  const { settings: siteSettings, uploadAndSave } = useSiteSettings();
+  const [assetCrop, setAssetCrop] = useState<{ src: string; asset: SiteAsset } | null>(null);
+  const [assetSaving, setAssetSaving] = useState<string | null>(null);
+  const [assetMsg, setAssetMsg] = useState<{ key: string; type: 'success' | 'error'; text: string } | null>(null);
+  const assetFileRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const [animes, setAnimes] = useState<Anime[]>([]);
   const [stats, setStats] = useState<SiteStats | null>(null);
   const [userList, setUserList] = useState<User[]>([]);
@@ -401,6 +409,7 @@ const AdminDashboard = () => {
                 <TabButton active={activeTab==='moderation'} onClick={()=>setActiveTab('moderation')} icon={<CheckCircle size={18}/>}>Onay Bekleyenler</TabButton>
                 <TabButton active={activeTab==='users'} onClick={()=>setActiveTab('users')} icon={<Users size={18}/>}>Kullanıcılar</TabButton>
                 <TabButton active={activeTab==='manage'} onClick={()=>setActiveTab('manage')} icon={<Trash2 size={18}/>}>Düzenle & Sil</TabButton>
+                <TabButton active={activeTab==='assets'} onClick={()=>setActiveTab('assets')} icon={<ImageIcon size={18}/>}>Site Görselleri</TabButton>
              </>
           )}
       </div>
@@ -420,6 +429,120 @@ const AdminDashboard = () => {
               <StatCard title="Onay Bekleyen" value={stats.pendingAnimes} icon={<CheckCircle className="text-amber-500"/>} />
               <StatCard title="Toplam Yorum" value={stats.totalComments} icon={<Activity className="text-green-500"/>} />
           </div>
+      )}
+
+      {activeTab === 'assets' && (
+        <div className="space-y-6">
+          <div>
+            <h2 className="text-lg font-bold text-white mb-1">Site Görselleri</h2>
+            <p className="text-sm text-gray-500">Yüklenen görseller Supabase Storage'a kaydedilir. Her yüklemede URL değişir, tarayıcı önbelleği sorunu olmaz.</p>
+          </div>
+
+          {/* Crop modal */}
+          {assetCrop && (
+            <ImageCropModal
+              imageSrc={assetCrop.src}
+              type={assetCrop.asset.cropType}
+              outputOverride={{ w: assetCrop.asset.outputW, h: assetCrop.asset.outputH }}
+              onCancel={() => setAssetCrop(null)}
+              onConfirm={async (dataUrl) => {
+                setAssetCrop(null);
+                setAssetSaving(assetCrop.asset.key);
+                setAssetMsg(null);
+                try {
+                  await uploadAndSave(assetCrop.asset.key, dataUrl);
+                  setAssetMsg({ key: assetCrop.asset.key, type: 'success', text: 'Başarıyla güncellendi!' });
+                } catch (e: any) {
+                  setAssetMsg({ key: assetCrop.asset.key, type: 'error', text: e.message || 'Yükleme başarısız.' });
+                } finally {
+                  setAssetSaving(null);
+                }
+              }}
+            />
+          )}
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {SITE_ASSETS.map(asset => {
+              const currentUrl = siteSettings[asset.key];
+              const saving = assetSaving === asset.key;
+              const msg = assetMsg?.key === asset.key ? assetMsg : null;
+              return (
+                <div key={asset.key} className="bg-[#18181b] border border-gray-800 rounded-xl p-5 space-y-4">
+                  <div>
+                    <h3 className="font-bold text-white text-sm">{asset.label}</h3>
+                    <p className="text-xs text-gray-500 mt-0.5">{asset.description}</p>
+                  </div>
+
+                  {/* Current preview */}
+                  <div className="flex items-center gap-4">
+                    <div className={`flex-shrink-0 bg-gray-900 border border-gray-700 flex items-center justify-center overflow-hidden ${asset.key === 'favicon' ? 'w-16 h-16 rounded-lg' : 'w-20 h-20 rounded-xl'}`}>
+                      {currentUrl
+                        ? <img src={currentUrl} alt={asset.label} className="w-full h-full object-contain" />
+                        : <ImageIcon size={24} className="text-gray-600" />
+                      }
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      {currentUrl
+                        ? <p className="text-xs text-gray-500 break-all line-clamp-2">{currentUrl}</p>
+                        : <p className="text-xs text-gray-600 italic">Henüz özel görsel yok, varsayılan kullanılıyor.</p>
+                      }
+                    </div>
+                  </div>
+
+                  {msg && (
+                    <div className={`text-xs px-3 py-2 rounded-lg font-medium ${msg.type === 'success' ? 'bg-green-900/30 text-green-400 border border-green-800' : 'bg-red-900/30 text-red-400 border border-red-800'}`}>
+                      {msg.text}
+                    </div>
+                  )}
+
+                  {/* Hidden file input */}
+                  <input
+                    type="file"
+                    accept=".jpg,.jpeg,.png,.webp"
+                    className="hidden"
+                    ref={el => { assetFileRefs.current[asset.key] = el; }}
+                    onChange={e => {
+                      const file = e.target.files?.[0];
+                      e.target.value = '';
+                      if (!file) return;
+                      const allowed = ['image/jpeg', 'image/png', 'image/webp'];
+                      if (!allowed.includes(file.type)) {
+                        setAssetMsg({ key: asset.key, type: 'error', text: 'Sadece JPG, PNG, WEBP kabul edilir.' });
+                        return;
+                      }
+                      if (file.size > 3 * 1024 * 1024) {
+                        setAssetMsg({ key: asset.key, type: 'error', text: 'Dosya 3MB sınırını aşıyor.' });
+                        return;
+                      }
+                      const reader = new FileReader();
+                      reader.onloadend = () => setAssetCrop({ src: reader.result as string, asset });
+                      reader.readAsDataURL(file);
+                    }}
+                  />
+
+                  <button
+                    onClick={() => assetFileRefs.current[asset.key]?.click()}
+                    disabled={saving}
+                    className="w-full flex items-center justify-center gap-2 py-2.5 px-4 bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-black font-bold text-sm rounded-xl transition-colors"
+                  >
+                    {saving ? <Loader2 size={16} className="animate-spin" /> : <Upload size={16} />}
+                    {saving ? 'Yükleniyor...' : 'Görsel Seç & Değiştir'}
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Info box */}
+          <div className="bg-blue-900/10 border border-blue-900/30 rounded-xl p-4 text-sm text-blue-300">
+            <p className="font-bold mb-1">Supabase kurulumu gerekiyor mu?</p>
+            <p className="text-xs text-blue-400 leading-relaxed">
+              Bu özellik için Supabase'de <code className="bg-blue-900/40 px-1 rounded">site-assets</code> adlı bir <strong>public Storage bucket</strong> ve
+              <code className="bg-blue-900/40 px-1 rounded mx-1">site_settings</code> tablosu gerekir.
+              <br/>SQL: <code className="bg-blue-900/40 px-1 rounded">CREATE TABLE site_settings (key TEXT PRIMARY KEY, value TEXT NOT NULL, updated_at TIMESTAMPTZ DEFAULT now());</code>
+            </p>
+          </div>
+        </div>
       )}
 
       {activeTab === 'manage' && (

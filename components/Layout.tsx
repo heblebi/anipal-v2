@@ -3,11 +3,13 @@ import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import Button from './Button';
 import { UserRole, Notification } from '../types';
-import { Cat, LogOut, Menu, X, Settings, User as UserIcon, Compass, Search, Trophy, Bell, Newspaper, ChevronDown } from 'lucide-react';
+import { LogOut, Menu, X, Settings, User as UserIcon, Search, Bell, ChevronDown } from 'lucide-react';
+import { useSiteSettings } from '../context/SiteSettingsContext';
 import { getNotifications, markNotificationsAsRead } from '../services/mockBackend';
 
 const Layout = ({ children }: { children?: React.ReactNode }) => {
   const { user, isAuthenticated, logoutUser } = useAuth();
+  const { settings: siteSettings } = useSiteSettings();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false);
   const [scrolled, setScrolled] = useState(false);
   
@@ -28,16 +30,23 @@ const Layout = ({ children }: { children?: React.ReactNode }) => {
       return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  // Poll for notifications every 10 seconds (Mock real-time)
+  // Poll for notifications every 60 seconds
   useEffect(() => {
       if(!user) return;
+      let pending = false;
       const fetchNotifs = async () => {
-          const data = await getNotifications(user.id);
-          setNotifications(data);
-          setUnreadCount(data.filter(n => !n.isRead).length);
+          if (pending) return;
+          pending = true;
+          try {
+              const data = await getNotifications(user.id);
+              setNotifications(data);
+              setUnreadCount(data.filter(n => !n.isRead).length);
+          } catch { /* ignore */ } finally {
+              pending = false;
+          }
       };
-      fetchNotifs(); // Initial
-      const interval = setInterval(fetchNotifs, 5000);
+      fetchNotifs();
+      const interval = setInterval(fetchNotifs, 60000);
       return () => clearInterval(interval);
   }, [user]);
 
@@ -80,8 +89,8 @@ const Layout = ({ children }: { children?: React.ReactNode }) => {
             <div className="flex items-center gap-8">
                 {/* Brand */}
                 <Link to="/" className="flex items-center gap-2 group">
-                    <Cat className="w-8 h-8 text-amber-500 transform group-hover:-rotate-12 transition-transform" />
-                    <span className="text-2xl font-black tracking-tighter text-white">ANIPAL</span>
+                    <img src={siteSettings.navbar_logo || '/logo.png'} alt="Anipal Logo" className="w-20 h-20 object-contain -mr-5 transform group-hover:-rotate-12 transition-transform" />
+                    <span className="text-2xl font-black tracking-tighter bg-gradient-to-r from-amber-400 to-orange-500 bg-clip-text text-transparent drop-shadow-[0_0_8px_rgba(251,146,60,0.4)]">ANIPAL</span>
                 </Link>
 
                 {/* Desktop Nav */}
