@@ -268,6 +268,21 @@ export const logout = async () => {
     await supabase.auth.signOut();
 };
 
+// Session nesnesini doğrudan alarak profil getirir.
+// onAuthStateChange içinde kullanılır — tekrar getSession() çağırmaz,
+// token yenileme race'ini önler.
+export const getUserFromSession = async (session: { user: { id: string; email?: string | undefined } }): Promise<User | null> => {
+    for (let attempt = 0; attempt < 3; attempt++) {
+        try {
+            const profile = await fetchProfile(session.user.id);
+            return mapProfile(profile, session.user.email);
+        } catch {
+            if (attempt < 2) await new Promise(r => setTimeout(r, 800));
+        }
+    }
+    return null;
+};
+
 export const getCurrentUser = async (): Promise<User | null> => {
     if (!USE_SUPABASE) {
         const id = LS.get(LS_SESSION);
@@ -277,16 +292,7 @@ export const getCurrentUser = async (): Promise<User | null> => {
     }
     const { data: { session } } = await supabase.auth.getSession();
     if (!session?.user) return null;
-    // Retry once on transient failure (e.g. token refresh race, slow network)
-    for (let attempt = 0; attempt < 2; attempt++) {
-        try {
-            const profile = await fetchProfile(session.user.id);
-            return mapProfile(profile, session.user.email);
-        } catch {
-            if (attempt === 0) await new Promise(r => setTimeout(r, 600));
-        }
-    }
-    return null;
+    return getUserFromSession(session);
 };
 
 // ─── Notifications ────────────────────────────────────────────────────────────

@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { User } from '../types';
 import { supabase } from '../services/supabase';
-import { getCurrentUser, logout as apiLogout } from '../services/mockBackend';
+import { getCurrentUser, getUserFromSession, logout as apiLogout } from '../services/mockBackend';
 
 interface AuthContextType {
   user: User | null;
@@ -41,12 +41,9 @@ export const AuthProvider = ({ children }: { children?: ReactNode }) => {
 
       if (event === 'INITIAL_SESSION') {
         if (!session) { finishLoading(null); return; }
-        // Profil getir — 3 deneme (yavaş bağlantı / büyük profil için)
-        let u: User | null = null;
-        for (let i = 0; i < 3; i++) {
-          try { u = await getCurrentUser(); if (u) break; } catch {}
-          if (i < 2) await new Promise(r => setTimeout(r, 700));
-        }
+        // session'ı doğrudan kullan — içinde tekrar getSession() çağırmaz,
+        // token yenileme race'ini önler
+        const u = await getUserFromSession(session).catch(() => null);
         finishLoading(u);
 
       } else if (event === 'SIGNED_OUT') {
@@ -54,12 +51,9 @@ export const AuthProvider = ({ children }: { children?: ReactNode }) => {
         finishLoading(null);
 
       } else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
-        // Sonraki login / token yenilemeleri — isLoading'e dokunma
         if (!session) return;
-        try {
-          const u = await getCurrentUser();
-          if (u && !cancelled) setUser(u);
-        } catch {}
+        const u = await getUserFromSession(session).catch(() => null);
+        if (u && !cancelled) setUser(u);
       }
     });
 
