@@ -49,12 +49,15 @@ export const AuthProvider = ({ children }: { children?: ReactNode }) => {
         setUser(null);
         finishLoading();
       } else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
-        if (!session) { finishLoading(); return; }
+        // Do NOT call finishLoading() here — INITIAL_SESSION fires concurrently
+        // and is the sole authority for resolving the initial loading state.
+        // Calling finishLoading() here would race with INITIAL_SESSION and
+        // could set isLoading=false while INITIAL_SESSION is still fetching profile.
+        if (!session) return;
         try {
           const u = await getCurrentUser();
           if (u) setUser(u); // never override valid user with null
         } catch { /* ignore */ }
-        finishLoading(); // ensure loading stops even if INITIAL_SESSION didn't fire
       }
     });
 
