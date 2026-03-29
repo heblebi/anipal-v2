@@ -20,45 +20,46 @@ export const AuthProvider = ({ children }: { children?: ReactNode }) => {
 
   useEffect(() => {
     let cancelled = false;
-    let initialLoadDone = false;
+    let loadingFinished = false;
 
-    // İlk yüklemeyi bir kez tamamlar. Sonraki çağrılar no-op.
-    const completeLoad = (u: User | null) => {
-      if (cancelled || initialLoadDone) return;
-      initialLoadDone = true;
+    const finishLoading = (u: User | null) => {
+      if (cancelled || loadingFinished) return;
+      loadingFinished = true;
       if (u) setUser(u);
       setIsLoading(false);
     };
 
-    // 5s güvenlik ağı — hiçbir event gelmediyse yine de loading'i bitir
-    const timeout = setTimeout(() => completeLoad(null), 5000);
+    // 8s güvenlik ağı
+    const timeout = setTimeout(() => finishLoading(null), 8000);
 
-    // Hızlı yol: önce session var mı diye bak.
-    // Yoksa → hemen login göster.
-    // Varsa → profil getirmeye çalış; başarısızsa auth event'lerini bekle
-    // (null override'ı önlemek için completeLoad'u sadece başarıda çağırıyoruz).
-    supabase.auth.getSession()
-      .then(async ({ data: { session } }) => {
-        if (cancelled) return;
-        if (!session) { completeLoad(null); return; }
-        const u = await getCurrentUser().catch(() => null);
-        if (!cancelled && u) completeLoad(u);
-        // u null ise: SIGNED_IN / TOKEN_REFRESHED / INITIAL_SESSION halleder
-      })
-      .catch(() => completeLoad(null));
-
+    // Supabase v2'de onAuthStateChange her zaman INITIAL_SESSION fırlatır.
+    // Bu event, token yenileme dahil tüm işlemler bittikten SONRA gelir —
+    // F5 sonrası güvenilir tek başlangıç noktası budur.
+    // getSession() ile paralel çalıştırmıyoruz çünkü token refresh race'e girer.
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (cancelled) return;
-      if (event === 'SIGNED_OUT') {
-        setUser(null);
-        completeLoad(null); // henüz bitmemişse bitir
-      } else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'INITIAL_SESSION') {
-        if (!session) { completeLoad(null); return; }
-        const u = await getCurrentUser().catch(() => null);
-        if (!cancelled && u) {
-          setUser(u);          // her zaman güncelle (token yenileme vb.)
-          completeLoad(u);     // henüz bitmemişse bitir
+
+      if (event === 'INITIAL_SESSION') {
+        if (!session) { finishLoading(null); return; }
+        // Profil getir — 3 deneme (yavaş bağlantı / büyük profil için)
+        let u: User | null = null;
+        for (let i = 0; i < 3; i++) {
+          try { u = await getCurrentUser(); if (u) break; } catch {}
+          if (i < 2) await new Promise(r => setTimeout(r, 700));
         }
+        finishLoading(u);
+
+      } else if (event === 'SIGNED_OUT') {
+        setUser(null);
+        finishLoading(null);
+
+      } else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+        // Sonraki login / token yenilemeleri — isLoading'e dokunma
+        if (!session) return;
+        try {
+          const u = await getCurrentUser();
+          if (u && !cancelled) setUser(u);
+        } catch {}
       }
     });
 
