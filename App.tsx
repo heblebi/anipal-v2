@@ -24,7 +24,11 @@ import { UserRole } from './types';
 // Normal kullanıcı korumalı rota
 const ProtectedRoute = ({ children, requireRole }: { children?: React.ReactNode, requireRole?: UserRole[] }) => {
   const { user, isAuthenticated, isLoading } = useAuth();
-  if (isLoading) return null;
+  if (isLoading) return (
+    <div className="flex items-center justify-center min-h-screen bg-[#0f0f10]">
+      <div className="w-10 h-10 border-4 border-amber-500 border-t-transparent rounded-full animate-spin" />
+    </div>
+  );
   if (!isAuthenticated) return <Navigate to="/login" />;
   if (requireRole && user && !requireRole.includes(user.role)) return <Navigate to="/" />;
   return <>{children}</>;

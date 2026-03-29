@@ -49,43 +49,55 @@ export const AuthProvider = ({ children }: { children?: ReactNode }) => {
 
   useEffect(() => {
     let cancelled = false;
+    let loadingFinished = false;
+
+    const finishLoading = () => {
+      if (!loadingFinished && !cancelled) {
+        loadingFinished = true;
+        setIsLoading(false);
+      }
+    };
+
+    // Güvenlik ağı: 6s sonra her halükarda loading bitir
+    const safetyTimer = setTimeout(finishLoading, 6000);
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (cancelled) return;
 
       if (event === 'SIGNED_OUT') {
-        // Tek güvenilir çıkış sinyali
         clearCache();
         setUser(null);
-        setIsLoading(false);
+        finishLoading();
         return;
       }
 
       if (event === 'INITIAL_SESSION') {
         if (!session) {
-          // Session yok — ama cache'i silmiyoruz, sadece loading'i bitir.
-          // Eğer gerçekten çıkış yapıldıysa Supabase SIGNED_OUT da gönderir.
-          setIsLoading(false);
+          // Session yok — cache'i temizle ve loading'i bitir
+          clearCache();
+          setUser(null);
+          finishLoading();
           return;
         }
-        // Oturum var — profili arka planda getir
+        // Session var — profili getir
         const u = await getUserFromSession(session).catch(() => null);
         if (cancelled) return;
         if (u) { saveCache(u); setUser(u); }
-        // u null olsa bile cache'den gelen user kalır — zorla çıkarma
-        setIsLoading(false);
+        finishLoading();
         return;
       }
 
-      if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+      if (event === 'TOKEN_REFRESHED' || event === 'SIGNED_IN') {
         if (!session) return;
         const u = await getUserFromSession(session).catch(() => null);
         if (!cancelled && u) { saveCache(u); setUser(u); }
+        finishLoading(); // session var ama INITIAL_SESSION gelmemişse burada bitir
       }
     });
 
     return () => {
       cancelled = true;
+      clearTimeout(safetyTimer);
       subscription.unsubscribe();
     };
   }, []);
