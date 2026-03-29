@@ -63,9 +63,8 @@ export const AuthProvider = ({ children }: { children?: ReactNode }) => {
 
       if (event === 'INITIAL_SESSION') {
         if (!session) {
-          // Gerçekten oturum yok — çıkış yap
-          clearCache();
-          setUser(null);
+          // Session yok — ama cache'i silmiyoruz, sadece loading'i bitir.
+          // Eğer gerçekten çıkış yapıldıysa Supabase SIGNED_OUT da gönderir.
           setIsLoading(false);
           return;
         }
