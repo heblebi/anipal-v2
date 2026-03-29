@@ -126,20 +126,16 @@ const AdminDashboard = () => {
 
   const loadData = async () => {
     try {
-      const nl = await getNews(true);
+      const isAdmin = user?.role === UserRole.ADMIN;
+      const [nl, animeData, statsData, userData] = await Promise.all([
+        getNews(true),
+        !isEditor ? getAnimes({ status: undefined }) : Promise.resolve([]),
+        isAdmin ? getSiteStats() : Promise.resolve(null),
+        isAdmin ? getUsers() : Promise.resolve([]),
+      ]);
       setNewsList(nl);
-
-      if (!isEditor) {
-        const data = await getAnimes({ status: undefined });
-        setAnimes(data);
-      }
-
-      if(user?.role === UserRole.ADMIN) {
-          const s = await getSiteStats();
-          setStats(s);
-          const u = await getUsers();
-          setUserList(u);
-      }
+      if (!isEditor) setAnimes(animeData);
+      if (isAdmin) { setStats(statsData); setUserList(userData); }
     } catch (err) {
       console.error('AdminDashboard loadData error:', err);
       setMsg({ type: 'error', text: 'Veriler yüklenirken hata oluştu.' });
@@ -441,13 +437,19 @@ const AdminDashboard = () => {
 
       {/* CONTENT AREAS */}
       
-      {activeTab === 'stats' && stats && (
+      {activeTab === 'stats' && (
+        stats ? (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-6">
               <StatCard title="Toplam Kullanıcı" value={stats.totalUsers} icon={<Users className="text-blue-500"/>} />
               <StatCard title="Toplam Anime" value={stats.totalAnimes} icon={<PlaySquare className="text-purple-500"/>} />
               <StatCard title="Onay Bekleyen" value={stats.pendingAnimes} icon={<CheckCircle className="text-amber-500"/>} />
               <StatCard title="Toplam Yorum" value={stats.totalComments} icon={<Activity className="text-green-500"/>} />
           </div>
+        ) : (
+          <div className="flex items-center justify-center py-20">
+            <Loader2 size={32} className="animate-spin text-amber-500" />
+          </div>
+        )
       )}
 
       {activeTab === 'assets' && (
