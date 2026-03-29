@@ -30,14 +30,21 @@ export const AuthProvider = ({ children }: { children?: ReactNode }) => {
       }
     };
 
-    // Safety net: never stay in loading state more than 6 seconds
-    loadingTimeout = setTimeout(finishLoading, 6000);
+    // Safety net: 5 saniye sonra her halükarda loading'i bitir
+    loadingTimeout = setTimeout(finishLoading, 5000);
 
-    // Supabase v2: onAuthStateChange fires INITIAL_SESSION immediately on registration.
-    // This is the single source of truth for the initial auth state — no separate
-    // getCurrentUser() call that can race against the auth state listener.
+    // Hızlı yol: oturum varsa hemen kullanıcıyı getir.
+    // Başarılı olursa loading'i bitirir; null dönerse INITIAL_SESSION bekler
+    // (null durumunda finishLoading çağırmıyoruz — isLoading=false ile yanlış
+    // yönlendirmeyi önlemek için INITIAL_SESSION finalizer olarak kalıyor).
+    getCurrentUser().then(u => {
+      if (u) { setUser(u); finishLoading(); }
+    }).catch(() => {});
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (event === 'INITIAL_SESSION') {
+        // INITIAL_SESSION her zaman tetiklenir (oturum var/yok fark etmez).
+        // Loading'in garantili finalizer'ı budur.
         if (session) {
           try {
             const u = await getCurrentUser();
@@ -49,14 +56,10 @@ export const AuthProvider = ({ children }: { children?: ReactNode }) => {
         setUser(null);
         finishLoading();
       } else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
-        // Do NOT call finishLoading() here — INITIAL_SESSION fires concurrently
-        // and is the sole authority for resolving the initial loading state.
-        // Calling finishLoading() here would race with INITIAL_SESSION and
-        // could set isLoading=false while INITIAL_SESSION is still fetching profile.
         if (!session) return;
         try {
           const u = await getCurrentUser();
-          if (u) setUser(u); // never override valid user with null
+          if (u) setUser(u); // geçerli kullanıcının üzerine null yazılmaz
         } catch { /* ignore */ }
       }
     });
