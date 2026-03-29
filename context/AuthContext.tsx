@@ -19,54 +19,53 @@ export const AuthProvider = ({ children }: { children?: ReactNode }) => {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    let loadingDone = false;
-    let loadingTimeout: ReturnType<typeof setTimeout>;
+    let cancelled = false;
+    let initialLoadDone = false;
 
-    const finishLoading = () => {
-      if (!loadingDone) {
-        loadingDone = true;
-        clearTimeout(loadingTimeout);
-        setIsLoading(false);
-      }
+    // İlk yüklemeyi bir kez tamamlar. Sonraki çağrılar no-op.
+    const completeLoad = (u: User | null) => {
+      if (cancelled || initialLoadDone) return;
+      initialLoadDone = true;
+      if (u) setUser(u);
+      setIsLoading(false);
     };
 
-    // Safety net: 5 saniye sonra her halükarda loading'i bitir
-    loadingTimeout = setTimeout(finishLoading, 5000);
+    // 5s güvenlik ağı — hiçbir event gelmediyse yine de loading'i bitir
+    const timeout = setTimeout(() => completeLoad(null), 5000);
 
-    // Hızlı yol: oturum varsa hemen kullanıcıyı getir.
-    // Başarılı olursa loading'i bitirir; null dönerse INITIAL_SESSION bekler
-    // (null durumunda finishLoading çağırmıyoruz — isLoading=false ile yanlış
-    // yönlendirmeyi önlemek için INITIAL_SESSION finalizer olarak kalıyor).
-    getCurrentUser().then(u => {
-      if (u) { setUser(u); finishLoading(); }
-    }).catch(() => {});
+    // Hızlı yol: önce session var mı diye bak.
+    // Yoksa → hemen login göster.
+    // Varsa → profil getirmeye çalış; başarısızsa auth event'lerini bekle
+    // (null override'ı önlemek için completeLoad'u sadece başarıda çağırıyoruz).
+    supabase.auth.getSession()
+      .then(async ({ data: { session } }) => {
+        if (cancelled) return;
+        if (!session) { completeLoad(null); return; }
+        const u = await getCurrentUser().catch(() => null);
+        if (!cancelled && u) completeLoad(u);
+        // u null ise: SIGNED_IN / TOKEN_REFRESHED / INITIAL_SESSION halleder
+      })
+      .catch(() => completeLoad(null));
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (event === 'INITIAL_SESSION') {
-        // INITIAL_SESSION her zaman tetiklenir (oturum var/yok fark etmez).
-        // Loading'in garantili finalizer'ı budur.
-        if (session) {
-          try {
-            const u = await getCurrentUser();
-            if (u) setUser(u);
-          } catch { /* ignore */ }
-        }
-        finishLoading();
-      } else if (event === 'SIGNED_OUT') {
+      if (cancelled) return;
+      if (event === 'SIGNED_OUT') {
         setUser(null);
-        finishLoading();
-      } else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
-        if (!session) return;
-        try {
-          const u = await getCurrentUser();
-          if (u) setUser(u); // geçerli kullanıcının üzerine null yazılmaz
-        } catch { /* ignore */ }
+        completeLoad(null); // henüz bitmemişse bitir
+      } else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'INITIAL_SESSION') {
+        if (!session) { completeLoad(null); return; }
+        const u = await getCurrentUser().catch(() => null);
+        if (!cancelled && u) {
+          setUser(u);          // her zaman güncelle (token yenileme vb.)
+          completeLoad(u);     // henüz bitmemişse bitir
+        }
       }
     });
 
     return () => {
+      cancelled = true;
+      clearTimeout(timeout);
       subscription.unsubscribe();
-      clearTimeout(loadingTimeout);
     };
   }, []);
 
