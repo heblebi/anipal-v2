@@ -20,46 +20,33 @@ export const AuthProvider = ({ children }: { children?: ReactNode }) => {
 
   useEffect(() => {
     let cancelled = false;
-    let loadingFinished = false;
 
-    const finishLoading = (u: User | null) => {
-      if (cancelled || loadingFinished) return;
-      loadingFinished = true;
-      if (u) setUser(u);
-      setIsLoading(false);
-    };
+    // Supabase v2: getSession() token refresh'i bekler, her zaman doğru session döner.
+    // Bunu ilk yükleme için kullanıyoruz; sonraki değişiklikler onAuthStateChange'den gelir.
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      if (cancelled) return;
+      if (session) {
+        const u = await getUserFromSession(session).catch(() => null);
+        if (!cancelled && u) setUser(u);
+      }
+      if (!cancelled) setIsLoading(false);
+    }).catch(() => {
+      if (!cancelled) setIsLoading(false);
+    });
 
-    // 8s güvenlik ağı
-    const timeout = setTimeout(() => finishLoading(null), 8000);
-
-    // Supabase v2'de onAuthStateChange her zaman INITIAL_SESSION fırlatır.
-    // Bu event, token yenileme dahil tüm işlemler bittikten SONRA gelir —
-    // F5 sonrası güvenilir tek başlangıç noktası budur.
-    // getSession() ile paralel çalıştırmıyoruz çünkü token refresh race'e girer.
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (cancelled) return;
-
-      if (event === 'INITIAL_SESSION') {
-        if (!session) { finishLoading(null); return; }
-        // session'ı doğrudan kullan — içinde tekrar getSession() çağırmaz,
-        // token yenileme race'ini önler
-        const u = await getUserFromSession(session).catch(() => null);
-        finishLoading(u);
-
-      } else if (event === 'SIGNED_OUT') {
+      if (event === 'SIGNED_OUT') {
         setUser(null);
-        finishLoading(null);
-
       } else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
         if (!session) return;
         const u = await getUserFromSession(session).catch(() => null);
-        if (u && !cancelled) setUser(u);
+        if (!cancelled && u) setUser(u);
       }
     });
 
     return () => {
       cancelled = true;
-      clearTimeout(timeout);
       subscription.unsubscribe();
     };
   }, []);
