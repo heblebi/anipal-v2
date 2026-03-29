@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { UserRole, Anime, User, AnimeStatus, SiteStats, NewsItem } from '../types';
+import { UserRole, Anime, User, AnimeStatus, SiteStats, NewsItem, AnimeRequest } from '../types';
 import { useNavigate } from 'react-router-dom';
 import Input from '../components/Input';
 import Button from '../components/Button';
-import { addEpisodes, getAnimes, getSiteStats, getUsers, toggleBanUser, approveAnime, updateUserRole, deleteAnime, deleteEpisode, updateEpisode, getNews, createNews, updateNews, deleteNews, approveNews, fetchANNArticle } from '../services/mockBackend';
+import { addEpisodes, getAnimes, getSiteStats, getUsers, toggleBanUser, approveAnime, updateUserRole, deleteAnime, deleteEpisode, updateEpisode, getNews, createNews, updateNews, deleteNews, approveNews, fetchANNArticle, getAnimeRequests, updateAnimeRequestStatus, deleteUser } from '../services/mockBackend';
 
 interface EmbedResult {
   source: string;
@@ -15,7 +15,7 @@ interface EmbedResult {
   error?: string;
   url?: string;
 }
-import { Activity, Download, Users, CheckCircle, ShieldAlert, PlaySquare, Search, Shield, Plus, Trash2, Image, ChevronDown, ChevronRight, Pencil, X, Save, Globe, Loader2, CheckCircle2, AlertCircle, ImageIcon, Upload } from 'lucide-react';
+import { Activity, Download, Users, CheckCircle, ShieldAlert, PlaySquare, Search, Shield, Plus, Trash2, Image, ChevronDown, ChevronRight, Pencil, X, Save, Globe, Loader2, CheckCircle2, AlertCircle, ImageIcon, Upload, Send, UserX } from 'lucide-react';
 import ImageCropModal from '../components/ImageCropModal';
 import { SITE_ASSETS, SiteAsset } from '../services/siteSettings';
 import { useSiteSettings } from '../context/SiteSettingsContext';
@@ -33,11 +33,13 @@ const AdminDashboard = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const isEditor = user?.role === UserRole.EDITOR;
-  const [activeTab, setActiveTab] = useState<'stats' | 'episodes' | 'moderation' | 'users' | 'manage' | 'news' | 'assets'>(isEditor ? 'news' : 'stats');
+  const [activeTab, setActiveTab] = useState<'stats' | 'episodes' | 'moderation' | 'users' | 'manage' | 'news' | 'assets' | 'requests'>(isEditor ? 'news' : 'stats');
   const { settings: siteSettings, uploadAndSave } = useSiteSettings();
   const [assetCrop, setAssetCrop] = useState<{ src: string; asset: SiteAsset } | null>(null);
   const [assetSaving, setAssetSaving] = useState<string | null>(null);
   const [assetMsg, setAssetMsg] = useState<{ key: string; type: 'success' | 'error'; text: string } | null>(null);
+  const [requests, setRequests] = useState<AnimeRequest[]>([]);
+  const [requestsLoading, setRequestsLoading] = useState(false);
   const assetFileRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const [animes, setAnimes] = useState<Anime[]>([]);
   const [stats, setStats] = useState<SiteStats | null>(null);
@@ -115,6 +117,11 @@ const AdminDashboard = () => {
     }
     loadData();
   }, [user, activeTab]);
+
+  const loadRequests = async () => {
+    setRequestsLoading(true);
+    try { setRequests(await getAnimeRequests()); } catch { /* ignore */ } finally { setRequestsLoading(false); }
+  };
 
   const loadData = async () => {
     try {
@@ -287,6 +294,16 @@ const AdminDashboard = () => {
       }
   };
 
+  const handleDeleteUser = async (uid: string, username: string) => {
+      if (!window.confirm(`"${username}" kullanıcısını kalıcı olarak silmek istediğinize emin misiniz? Bu işlem geri alınamaz.`)) return;
+      try {
+          await deleteUser(uid);
+          setUserList(prev => prev.filter(u => u.id !== uid));
+      } catch (e: any) {
+          alert(e.message);
+      }
+  };
+
   const handleRoleChange = async (uid: string, newRole: UserRole) => {
       try {
           await updateUserRole(uid, newRole);
@@ -410,6 +427,7 @@ const AdminDashboard = () => {
                 <TabButton active={activeTab==='users'} onClick={()=>setActiveTab('users')} icon={<Users size={18}/>}>Kullanıcılar</TabButton>
                 <TabButton active={activeTab==='manage'} onClick={()=>setActiveTab('manage')} icon={<Trash2 size={18}/>}>Düzenle & Sil</TabButton>
                 <TabButton active={activeTab==='assets'} onClick={()=>setActiveTab('assets')} icon={<ImageIcon size={18}/>}>Site Görselleri</TabButton>
+                <TabButton active={activeTab==='requests'} onClick={()=>{ setActiveTab('requests'); loadRequests(); }} icon={<Send size={18}/>}>İstekler</TabButton>
              </>
           )}
       </div>
@@ -829,6 +847,9 @@ const AdminDashboard = () => {
                                        <Shield size={12} />
                                        {u.role === UserRole.MODERATOR ? 'Yetkiyi Al' : 'Mod Yap'}
                                    </button>
+                                   <button onClick={() => handleDeleteUser(u.id, u.username)} className="flex-1 text-xs font-bold py-2.5 rounded-lg bg-red-900/30 text-red-400 border border-red-900/50 hover:bg-red-900/50 transition-colors flex items-center justify-center gap-1">
+                                       <UserX size={12} /> Hesabı Sil
+                                   </button>
                                </div>
                            )}
                        </div>
@@ -879,6 +900,9 @@ const AdminDashboard = () => {
                                                    <Shield size={12} />
                                                    {u.role === UserRole.MODERATOR ? 'Yetkiyi Al' : 'Mod Yap'}
                                                </button>
+                                               <button onClick={() => handleDeleteUser(u.id, u.username)} className="text-xs font-bold px-3 py-1.5 rounded bg-red-900/30 text-red-400 border border-red-900/50 hover:bg-red-900/50 transition-colors flex items-center gap-1">
+                                                   <UserX size={12} /> Sil
+                                               </button>
                                            </div>
                                        )}
                                    </td>
@@ -893,6 +917,51 @@ const AdminDashboard = () => {
            </div>
       )}
       
+      {activeTab === 'requests' && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-bold text-white flex items-center gap-2"><Send size={18} className="text-amber-500" /> İstekler & Öneriler</h2>
+            <button onClick={loadRequests} className="text-xs text-gray-400 hover:text-white border border-gray-700 px-3 py-1.5 rounded-lg transition-colors">Yenile</button>
+          </div>
+          {requestsLoading ? (
+            <div className="text-center py-10 text-gray-500">Yükleniyor...</div>
+          ) : requests.length === 0 ? (
+            <div className="text-center py-10 text-gray-500">Henüz istek yok.</div>
+          ) : (
+            <div className="space-y-3">
+              {requests.map(req => (
+                <div key={req.id} className="bg-gray-900 border border-gray-800 rounded-xl p-4 flex items-start gap-4">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap mb-1">
+                      <span className="font-bold text-white">{req.animeName}</span>
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${req.status === 'pending' ? 'bg-amber-500/10 text-amber-400 border-amber-500/30' : req.status === 'approved' ? 'bg-green-500/10 text-green-400 border-green-500/30' : 'bg-red-500/10 text-red-400 border-red-500/30'}`}>
+                        {req.status === 'pending' ? 'Bekliyor' : req.status === 'approved' ? 'Onaylandı' : 'Reddedildi'}
+                      </span>
+                    </div>
+                    <p className="text-xs text-gray-400">
+                      <span className="font-bold text-gray-300">{req.displayName || req.username}</span>
+                      <span className="text-gray-600"> @{req.username}</span>
+                      <span className="text-gray-600 ml-2">· {new Date(req.createdAt).toLocaleDateString('tr-TR')}</span>
+                    </p>
+                    {req.note && <p className="text-xs text-gray-500 mt-1 italic">"{req.note}"</p>}
+                  </div>
+                  {req.status === 'pending' && (
+                    <div className="flex gap-2 flex-shrink-0">
+                      <button onClick={async () => { await updateAnimeRequestStatus(req.id, 'approved'); loadRequests(); }} className="text-xs font-bold px-3 py-1.5 rounded-lg bg-green-500/10 text-green-400 border border-green-500/30 hover:bg-green-500/20 transition-colors">
+                        Onayla
+                      </button>
+                      <button onClick={async () => { await updateAnimeRequestStatus(req.id, 'rejected'); loadRequests(); }} className="text-xs font-bold px-3 py-1.5 rounded-lg bg-red-500/10 text-red-400 border border-red-500/30 hover:bg-red-500/20 transition-colors">
+                        Reddet
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
       {activeTab === 'episodes' && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Sol: Anime seç + mevcut bölümler */}

@@ -20,12 +20,7 @@ export const AuthProvider = ({ children }: { children?: ReactNode }) => {
 
   useEffect(() => {
     // İlk yüklemede mevcut oturumu kontrol et
-    getCurrentUser().then(async u => {
-      if (!u) {
-        // No user resolved — if a Supabase session still exists (orphan), clean it up
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session) await supabase.auth.signOut().catch(() => {});
-      }
+    getCurrentUser().then(u => {
       setUser(u);
       setIsLoading(false);
     }).catch(() => setIsLoading(false));

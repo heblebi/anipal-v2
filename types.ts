@@ -47,6 +47,7 @@ export interface NewsItem {
 export interface User {
   id: string;
   username: string;
+  displayName?: string;
   email: string;
   role: UserRole;
   token?: string;
@@ -161,4 +162,15 @@ export interface SiteStats {
   totalAnimes: number;
   pendingAnimes: number;
   totalComments: number;
+}
+
+export interface AnimeRequest {
+  id: string;
+  userId: string;
+  username: string;
+  displayName?: string;
+  animeName: string;
+  note?: string;
+  status: 'pending' | 'approved' | 'rejected';
+  createdAt: string;
 }

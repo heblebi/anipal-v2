@@ -30,6 +30,7 @@ const Profile = () => {
   // Edit Mode States
   const [isEditing, setIsEditing] = useState(false);
   const [editBio, setEditBio] = useState('');
+  const [editDisplayName, setEditDisplayName] = useState('');
   const [editAvatar, setEditAvatar] = useState('');
   const [editCover, setEditCover] = useState('');
   const [editDisplayedBadges, setEditDisplayedBadges] = useState<string[]>([]);
@@ -61,6 +62,7 @@ const Profile = () => {
         if(u) {
             setProfileUser(u);
             setEditBio(u.bio || '');
+            setEditDisplayName(u.displayName || u.username);
             setEditAvatar(u.avatar || '');
             setEditCover(u.coverImage || '');
             setEditDisplayedBadges(u.displayedBadges || []);
@@ -161,6 +163,7 @@ const Profile = () => {
       try {
           const updated = await updateUserProfile(profileUser.id, {
               bio: editBio,
+              displayName: editDisplayName.trim() || profileUser.username,
               avatar: editAvatar,
               coverImage: editCover,
               displayedBadges: editDisplayedBadges,
@@ -356,7 +359,17 @@ const Profile = () => {
             <div className="flex items-center justify-between mb-2">
                 <div>
                     <h1 className="text-xl sm:text-3xl font-bold text-white flex items-center gap-2 flex-wrap">
-                        {profileUser.username}
+                        {isEditing ? (
+                            <input
+                                className="bg-gray-900 border border-gray-700 rounded px-2 py-0.5 text-lg font-bold text-white focus:border-amber-500 outline-none w-48"
+                                value={editDisplayName}
+                                onChange={e => setEditDisplayName(e.target.value)}
+                                maxLength={32}
+                                placeholder="Görünen ad"
+                            />
+                        ) : (
+                            profileUser.displayName || profileUser.username
+                        )}
                         <span className="text-xs font-normal text-gray-500 bg-gray-900 border border-gray-700 px-2 py-0.5 rounded-full capitalize">
                             {profileUser.role}
                         </span>
@@ -369,6 +382,7 @@ const Profile = () => {
                           );
                         })()}
                     </h1>
+                    <p className="text-xs text-gray-500 mt-0.5">@{profileUser.username}</p>
                     {showcaseBadges.length > 0 && (
                         <div className="flex flex-wrap gap-1.5 mt-1.5">
                             {showcaseBadges.map(ach => (

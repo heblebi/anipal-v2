@@ -16,6 +16,7 @@ import AnimePage from './pages/AnimePage';
 import Settings from './pages/Settings';
 import Profile from './pages/Profile';
 import Leaderboard from './pages/Leaderboard';
+import AnimeRequestPage from './pages/AnimeRequestPage';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { SiteSettingsProvider } from './context/SiteSettingsContext';
 import { UserRole } from './types';
@@ -46,6 +47,7 @@ const AppRoutes = () => {
       {/* Kullanıcı korumalı rotalar */}
       <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
       <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
+      <Route path="/request" element={<AnimeRequestPage />} />
       <Route path="/profile/:userId" element={<Profile />} />
 
       {/* Admin paneli — normal Supabase auth, ADMIN rolü gerekli */}

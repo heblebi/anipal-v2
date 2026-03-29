@@ -103,6 +103,7 @@ export const getAllAchievements = () => ACHIEVEMENTS;
 const mapProfile = (p: any, email?: string): User => ({
     id: p.id,
     username: p.username,
+    displayName: p.display_name || p.username,
     email: email || p.email || '',
     role: p.role as UserRole,
     avatar: p.avatar || '',
@@ -189,6 +190,7 @@ const applyAchievements = (profile: any, commentsCount?: number): any => {
 
 const saveProfile = async (profile: any) => {
     const { error } = await supabase.from('profiles').update({
+        display_name: profile.display_name,
         role: profile.role,
         avatar: profile.avatar,
         cover_image: profile.cover_image,
@@ -228,7 +230,7 @@ export const login = async (emailOrUsername: string, password: string): Promise<
     }
     let email = emailOrUsername;
     if (!emailOrUsername.includes('@')) {
-        const { data, error } = await supabase.from('profiles').select('email').eq('username', emailOrUsername).single();
+        const { data, error } = await supabase.from('profiles').select('email').ilike('username', emailOrUsername).single();
         if (error || !data) throw new Error('Kullanıcı bulunamadı');
         email = data.email;
     }
@@ -618,8 +620,61 @@ export const updateUserRole = async (userId: string, newRole: UserRole) => {
     await supabase.from('profiles').update({ role: newRole }).eq('id', userId);
 };
 
+export const deleteUser = async (userId: string) => {
+    // Delete profile (cascade will handle related data if set up)
+    const { error } = await supabase.from('profiles').delete().eq('id', userId);
+    if (error) throw new Error(error.message);
+};
+
+// ─── Anime Requests ──────────────────────────────────────────────────────────
+
+const REQUEST_RATE_KEY = 'anipal_last_request';
+
+export const submitAnimeRequest = async (userId: string, username: string, displayName: string, animeName: string, note: string): Promise<void> => {
+    // Rate limit: 1 per day (localStorage)
+    const lastReq = localStorage.getItem(REQUEST_RATE_KEY);
+    if (lastReq) {
+        const diff = Date.now() - parseInt(lastReq, 10);
+        if (diff < 86400000) {
+            const hoursLeft = Math.ceil((86400000 - diff) / 3600000);
+            throw new Error(`Günde yalnızca 1 istek yapabilirsiniz. ${hoursLeft} saat sonra tekrar deneyin.`);
+        }
+    }
+    const { error } = await supabase.from('anime_requests').insert({
+        user_id: userId,
+        username,
+        display_name: displayName,
+        anime_name: animeName,
+        note,
+        status: 'pending',
+    });
+    if (error) throw new Error(error.message);
+    localStorage.setItem(REQUEST_RATE_KEY, Date.now().toString());
+};
+
+export const getAnimeRequests = async (): Promise<import('../types').AnimeRequest[]> => {
+    const { data, error } = await supabase.from('anime_requests').select('*').order('created_at', { ascending: false });
+    if (error) throw new Error(error.message);
+    return (data || []).map((r: any) => ({
+        id: r.id,
+        userId: r.user_id,
+        username: r.username,
+        displayName: r.display_name,
+        animeName: r.anime_name,
+        note: r.note,
+        status: r.status,
+        createdAt: r.created_at,
+    }));
+};
+
+export const updateAnimeRequestStatus = async (id: string, status: 'approved' | 'rejected'): Promise<void> => {
+    const { error } = await supabase.from('anime_requests').update({ status }).eq('id', id);
+    if (error) throw new Error(error.message);
+};
+
 export const updateUserProfile = async (id: string, data: any): Promise<User> => {
     const update: any = {};
+    if (data.displayName !== undefined) update.display_name = data.displayName;
     if (data.avatar !== undefined) update.avatar = data.avatar;
     if (data.coverImage !== undefined) update.cover_image = data.coverImage;
     if (data.bio !== undefined) update.bio = data.bio;

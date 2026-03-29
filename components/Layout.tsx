@@ -3,7 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import Button from './Button';
 import { UserRole, Notification } from '../types';
-import { LogOut, Menu, X, Settings, User as UserIcon, Search, Bell, ChevronDown } from 'lucide-react';
+import { LogOut, Menu, X, Settings, User as UserIcon, Search, Bell, ChevronDown, Send } from 'lucide-react';
 import { useSiteSettings } from '../context/SiteSettingsContext';
 import { getNotifications, markNotificationsAsRead } from '../services/mockBackend';
 
@@ -88,9 +88,9 @@ const Layout = ({ children }: { children?: React.ReactNode }) => {
             
             <div className="flex items-center gap-8">
                 {/* Brand */}
-                <Link to="/" className="flex items-center gap-2 group">
-                    <img src={siteSettings.navbar_logo || '/logo.png'} alt="Anipal Logo" className="w-20 h-20 object-contain -mr-5 transform group-hover:-rotate-12 transition-transform" />
-                    <span className="text-2xl font-black tracking-tighter bg-gradient-to-r from-amber-400 to-orange-500 bg-clip-text text-transparent drop-shadow-[0_0_8px_rgba(251,146,60,0.4)]">ANIPAL</span>
+                <Link to="/" className="flex items-center gap-1 group">
+                    <img src={siteSettings.navbar_logo || '/logo.png'} alt="Anipal Logo" className="w-12 h-12 md:w-20 md:h-20 object-contain -mr-2 md:-mr-5 transform group-hover:-rotate-12 transition-transform" />
+                    <span className="text-xl md:text-2xl font-black tracking-tighter bg-gradient-to-r from-amber-400 to-orange-500 bg-clip-text text-transparent drop-shadow-[0_0_8px_rgba(251,146,60,0.4)]">ANIPAL</span>
                 </Link>
 
                 {/* Desktop Nav */}
@@ -170,8 +170,8 @@ const Layout = ({ children }: { children?: React.ReactNode }) => {
                           className="w-8 h-8 rounded-full border border-gray-700 object-cover"
                         />
                         <div className="hidden lg:flex flex-col text-left">
-                            <span className="text-xs font-bold text-white">{user.username}</span>
-                            <span className="text-[10px] text-amber-500 font-bold">Lvl {user.level}</span>
+                            <span className="text-xs font-bold text-white">{user.displayName || user.username}</span>
+                            <span className="text-[10px] text-gray-500">@{user.username}</span>
                         </div>
                         <ChevronDown size={14} className={`text-gray-400 transition-transform hidden lg:block ${showProfileMenu ? 'rotate-180' : ''}`} />
                       </button>
@@ -179,7 +179,8 @@ const Layout = ({ children }: { children?: React.ReactNode }) => {
                       {showProfileMenu && (
                         <div className="absolute right-0 mt-3 w-48 bg-[#18181b] border border-gray-800 rounded-xl shadow-2xl overflow-hidden animate-in fade-in slide-in-from-top-2 z-50">
                           <div className="p-3 border-b border-gray-800">
-                            <p className="text-xs font-bold text-white truncate">{user.username}</p>
+                            <p className="text-xs font-bold text-white truncate">{user.displayName || user.username}</p>
+                            <p className="text-[10px] text-gray-500">@{user.username}</p>
                             <p className="text-[10px] text-amber-500">Seviye {user.level} · {user.xp} XP</p>
                           </div>
                           <Link
@@ -195,6 +196,13 @@ const Layout = ({ children }: { children?: React.ReactNode }) => {
                             className="flex items-center gap-3 px-4 py-3 text-sm text-gray-300 hover:bg-gray-800 hover:text-white transition-colors"
                           >
                             <Settings size={15} /> Ayarlar
+                          </Link>
+                          <Link
+                            to="/request"
+                            onClick={() => setShowProfileMenu(false)}
+                            className="flex items-center gap-3 px-4 py-3 text-sm text-gray-300 hover:bg-gray-800 hover:text-white transition-colors"
+                          >
+                            <Send size={15} /> İstek / Öneri
                           </Link>
                           <div className="border-t border-gray-800">
                             <button
@@ -275,6 +283,9 @@ const Layout = ({ children }: { children?: React.ReactNode }) => {
                     <Link to="/settings" onClick={() => setIsMobileMenuOpen(false)}
                       className="flex items-center gap-2 py-3 text-gray-400 border-b border-gray-800 text-sm"
                     ><Settings size={16} /> Ayarlar</Link>
+                    <Link to="/request" onClick={() => setIsMobileMenuOpen(false)}
+                      className="flex items-center gap-2 py-3 text-gray-400 border-b border-gray-800 text-sm"
+                    ><Send size={16} /> İstek / Öneri</Link>
                     <button onClick={handleLogout}
                       className="flex items-center gap-2 py-3 text-red-400 text-sm font-bold w-full"
                     ><LogOut size={16} /> Çıkış Yap</button>
