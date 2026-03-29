@@ -111,13 +111,13 @@ const AdminDashboard = () => {
   const [newsSaving, setNewsSaving] = useState(false);
 
   useEffect(() => {
-    if (authLoading) return; // wait for auth to finish before deciding to redirect
+    if (authLoading) return;
     if (!user || user.role !== UserRole.ADMIN) {
       navigate('/');
       return;
     }
     loadData();
-  }, [user, authLoading, activeTab]);
+  }, [authLoading, activeTab]); // user intentionally omitted — ProtectedRoute handles auth
 
   const loadRequests = async () => {
     setRequestsLoading(true);

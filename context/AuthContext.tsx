@@ -14,23 +14,19 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Kullanıcının temel bilgilerini (rol dahil) localStorage'da sakla.
-// Avatar gibi büyük alanları cache'lemiyoruz — sadece kimlik doğrulama için gerekli alanlar.
 const CACHE_KEY = 'anipal_auth_cache';
 
 const saveCache = (u: User) => {
   try {
-    const minimal = {
+    localStorage.setItem(CACHE_KEY, JSON.stringify({
       id: u.id, username: u.username, displayName: u.displayName,
       email: u.email, role: u.role, level: u.level, xp: u.xp,
-      isBanned: u.isBanned, avatar: '',
-      showAnimeList: u.showAnimeList,
-      watchlist: [], watchedEpisodes: [], likedEpisodes: [],
-      animeList: [], customLists: [], earnedAchievements: [],
-      displayedBadges: [], notifications: [], createdAt: u.createdAt,
-      coverImage: '', bio: '',
-    };
-    localStorage.setItem(CACHE_KEY, JSON.stringify(minimal));
+      isBanned: u.isBanned, avatar: '', coverImage: '', bio: '',
+      showAnimeList: u.showAnimeList, watchlist: [], watchedEpisodes: [],
+      likedEpisodes: [], animeList: [], customLists: [],
+      earnedAchievements: [], displayedBadges: [], notifications: [],
+      createdAt: u.createdAt,
+    }));
   } catch {}
 };
 
@@ -39,51 +35,50 @@ const loadCache = (): User | null => {
     const raw = localStorage.getItem(CACHE_KEY);
     if (!raw) return null;
     const u = JSON.parse(raw);
-    if (!u?.id || !u?.role) return null;
-    return u as User;
+    return (u?.id && u?.role) ? u as User : null;
   } catch { return null; }
 };
 
 const clearCache = () => { try { localStorage.removeItem(CACHE_KEY); } catch {} };
 
 export const AuthProvider = ({ children }: { children?: ReactNode }) => {
-  // Cache varsa hemen yükle — isLoading baştan false
   const cached = loadCache();
+  // Cache varsa anında yükle — isLoading hiç true olmaz
   const [user, setUser] = useState<User | null>(cached);
-  const [isLoading, setIsLoading] = useState(!cached); // cache yoksa loading göster
+  const [isLoading, setIsLoading] = useState(!cached);
 
   useEffect(() => {
     let cancelled = false;
 
-    // Arka planda Supabase session doğrulaması yap.
-    // Cache varsa kullanıcı zaten gösterildi, bu doğrulama sessizce çalışır.
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (cancelled) return;
 
-      if (!session) {
-        // Geçerli session yok — cache'i temizle, kullanıcıyı çıkar
+      if (event === 'SIGNED_OUT') {
+        // Tek güvenilir çıkış sinyali
         clearCache();
         setUser(null);
         setIsLoading(false);
         return;
       }
 
-      // Session geçerli — güncel profili arka planda getir
-      const u = await getUserFromSession(session).catch(() => null);
-      if (!cancelled) {
+      if (event === 'INITIAL_SESSION') {
+        if (!session) {
+          // Gerçekten oturum yok — çıkış yap
+          clearCache();
+          setUser(null);
+          setIsLoading(false);
+          return;
+        }
+        // Oturum var — profili arka planda getir
+        const u = await getUserFromSession(session).catch(() => null);
+        if (cancelled) return;
         if (u) { saveCache(u); setUser(u); }
+        // u null olsa bile cache'den gelen user kalır — zorla çıkarma
         setIsLoading(false);
+        return;
       }
-    }).catch(() => {
-      if (!cancelled) setIsLoading(false);
-    });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (cancelled) return;
-      if (event === 'SIGNED_OUT') {
-        clearCache();
-        setUser(null);
-      } else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+      if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
         if (!session) return;
         const u = await getUserFromSession(session).catch(() => null);
         if (!cancelled && u) { saveCache(u); setUser(u); }
@@ -103,8 +98,8 @@ export const AuthProvider = ({ children }: { children?: ReactNode }) => {
 
   const logoutUser = async () => {
     clearCache();
-    await apiLogout();
     setUser(null);
+    await apiLogout();
   };
 
   const updateUser = (data: Partial<User>) => {
