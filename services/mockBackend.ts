@@ -615,7 +615,9 @@ export const getSiteStats = async (): Promise<SiteStats> => {
 // ─── User management ──────────────────────────────────────────────────────────
 
 export const getUsers = async (): Promise<User[]> => {
-    const { data } = await supabase.from('profiles').select('*').order('created_at', { ascending: false });
+    const { data } = await supabase.from('profiles')
+        .select('id,username,display_name,email,role,xp,level,is_banned,created_at,bio,cover_image,watchlist,watched_episodes,liked_episodes,anime_list,custom_lists,earned_achievements,displayed_badges,notifications,show_anime_list')
+        .order('created_at', { ascending: false });
     return (data || []).map(p => mapProfile(p));
 };
 

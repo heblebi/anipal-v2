@@ -43,47 +43,47 @@ const clearCache = () => { try { localStorage.removeItem(CACHE_KEY); } catch {} 
 
 export const AuthProvider = ({ children }: { children?: ReactNode }) => {
   const cached = loadCache();
-  // Cache varsa anında yükle — isLoading hiç true olmaz
   const [user, setUser] = useState<User | null>(cached);
   const [isLoading, setIsLoading] = useState(!cached);
 
   useEffect(() => {
     let cancelled = false;
-    let loadingFinished = false;
+    let finished = false;
 
-    const finishLoading = () => {
-      if (!loadingFinished && !cancelled) {
-        loadingFinished = true;
+    const finish = () => {
+      if (!finished && !cancelled) {
+        finished = true;
         setIsLoading(false);
       }
     };
 
-    // Güvenlik ağı: 6s sonra her halükarda loading bitir
-    const safetyTimer = setTimeout(finishLoading, 6000);
+    // 5s güvenlik ağı
+    const timer = setTimeout(finish, 5000);
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (cancelled) return;
 
       if (event === 'SIGNED_OUT') {
+        // Tek güvenilir çıkış eventi — sadece burada cache silinir
         clearCache();
         setUser(null);
-        finishLoading();
+        finish();
         return;
       }
 
       if (event === 'INITIAL_SESSION') {
         if (!session) {
-          // Session yok — cache'i temizle ve loading'i bitir
-          clearCache();
-          setUser(null);
-          finishLoading();
+          // Session yok. Cache de yoksa gerçekten giriş yapılmamış.
+          // Cache VARSA dokunmuyoruz — SIGNED_OUT gelene kadar kullanıcı korunur.
+          if (!loadCache()) setUser(null);
+          finish();
           return;
         }
-        // Session var — profili getir
+        // Session var — güncel profili getir
         const u = await getUserFromSession(session).catch(() => null);
         if (cancelled) return;
         if (u) { saveCache(u); setUser(u); }
-        finishLoading();
+        finish();
         return;
       }
 
@@ -91,13 +91,13 @@ export const AuthProvider = ({ children }: { children?: ReactNode }) => {
         if (!session) return;
         const u = await getUserFromSession(session).catch(() => null);
         if (!cancelled && u) { saveCache(u); setUser(u); }
-        finishLoading(); // session var ama INITIAL_SESSION gelmemişse burada bitir
+        finish();
       }
     });
 
     return () => {
       cancelled = true;
-      clearTimeout(safetyTimer);
+      clearTimeout(timer);
       subscription.unsubscribe();
     };
   }, []);
