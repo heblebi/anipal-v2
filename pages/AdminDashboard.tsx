@@ -30,7 +30,7 @@ const newEpisodeRow = (num = ''): EpisodeRow => { const id = Date.now().toString
 const PLAYER_PRESETS = ['Fembed', 'Sibnet', 'Okru', 'Odnoklassniki', 'Mail.ru', 'Filemoon', 'Streamtape', 'Diğer'];
 
 const AdminDashboard = () => {
-  const { user } = useAuth();
+  const { user, isLoading: authLoading } = useAuth();
   const navigate = useNavigate();
   const isEditor = user?.role === UserRole.EDITOR;
   const [activeTab, setActiveTab] = useState<'stats' | 'episodes' | 'moderation' | 'users' | 'manage' | 'news' | 'assets' | 'requests'>(isEditor ? 'news' : 'stats');
@@ -111,12 +111,13 @@ const AdminDashboard = () => {
   const [newsSaving, setNewsSaving] = useState(false);
 
   useEffect(() => {
+    if (authLoading) return; // wait for auth to finish before deciding to redirect
     if (!user || user.role !== UserRole.ADMIN) {
       navigate('/');
       return;
     }
     loadData();
-  }, [user, activeTab]);
+  }, [user, authLoading, activeTab]);
 
   const loadRequests = async () => {
     setRequestsLoading(true);

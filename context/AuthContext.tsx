@@ -19,25 +19,49 @@ export const AuthProvider = ({ children }: { children?: ReactNode }) => {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // İlk yüklemede mevcut oturumu kontrol et
-    getCurrentUser().then(u => {
-      setUser(u);
-      setIsLoading(false);
-    }).catch(() => setIsLoading(false));
+    let loadingDone = false;
+    let loadingTimeout: ReturnType<typeof setTimeout>;
 
-    // Supabase auth değişikliklerini dinle (login/logout/token refresh)
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event) => {
-      if (event === 'SIGNED_OUT') {
+    const finishLoading = () => {
+      if (!loadingDone) {
+        loadingDone = true;
+        clearTimeout(loadingTimeout);
+        setIsLoading(false);
+      }
+    };
+
+    // Safety net: never stay in loading state more than 6 seconds
+    loadingTimeout = setTimeout(finishLoading, 6000);
+
+    // Supabase v2: onAuthStateChange fires INITIAL_SESSION immediately on registration.
+    // This is the single source of truth for the initial auth state — no separate
+    // getCurrentUser() call that can race against the auth state listener.
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === 'INITIAL_SESSION') {
+        if (session) {
+          try {
+            const u = await getCurrentUser();
+            if (u) setUser(u);
+          } catch { /* ignore */ }
+        }
+        finishLoading();
+      } else if (event === 'SIGNED_OUT') {
         setUser(null);
+        finishLoading();
       } else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+        if (!session) { finishLoading(); return; }
         try {
           const u = await getCurrentUser();
           if (u) setUser(u); // never override valid user with null
         } catch { /* ignore */ }
+        finishLoading(); // ensure loading stops even if INITIAL_SESSION didn't fire
       }
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      subscription.unsubscribe();
+      clearTimeout(loadingTimeout);
+    };
   }, []);
 
   const loginUser = (userData: User) => setUser(userData);

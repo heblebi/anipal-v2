@@ -277,10 +277,16 @@ export const getCurrentUser = async (): Promise<User | null> => {
     }
     const { data: { session } } = await supabase.auth.getSession();
     if (!session?.user) return null;
-    try {
-        const profile = await fetchProfile(session.user.id);
-        return mapProfile(profile, session.user.email);
-    } catch { return null; }
+    // Retry once on transient failure (e.g. token refresh race, slow network)
+    for (let attempt = 0; attempt < 2; attempt++) {
+        try {
+            const profile = await fetchProfile(session.user.id);
+            return mapProfile(profile, session.user.email);
+        } catch {
+            if (attempt === 0) await new Promise(r => setTimeout(r, 600));
+        }
+    }
+    return null;
 };
 
 // ─── Notifications ────────────────────────────────────────────────────────────
