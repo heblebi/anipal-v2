@@ -14,7 +14,7 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const CACHE_KEY = 'anipal_auth_cache';
+const CACHE_KEY = 'anipal_user_v1';
 
 const saveCache = (u: User) => {
   try {
@@ -39,73 +39,65 @@ const loadCache = (): User | null => {
   } catch { return null; }
 };
 
-const clearCache = () => { try { localStorage.removeItem(CACHE_KEY); } catch {} };
+const clearCache = () => {
+  try { localStorage.removeItem(CACHE_KEY); } catch {}
+};
 
 export const AuthProvider = ({ children }: { children?: ReactNode }) => {
   const cached = loadCache();
   const [user, setUser] = useState<User | null>(cached);
-  const [isLoading, setIsLoading] = useState(!cached);
+  const [isLoading, setIsLoading] = useState(true); // always start loading, resolve fast
 
   useEffect(() => {
     let cancelled = false;
-    let finished = false;
 
-    const finish = () => {
-      if (!finished && !cancelled) {
-        finished = true;
-        setIsLoading(false);
+    const init = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+
+        if (!session) {
+          // Gerçekten oturum yok
+          clearCache();
+          if (!cancelled) { setUser(null); setIsLoading(false); }
+          return;
+        }
+
+        // Session var — profili getir
+        const u = await getUserFromSession(session).catch(() => null);
+        if (!cancelled) {
+          if (u) { saveCache(u); setUser(u); }
+          else if (cached) setUser(cached); // profil gelmedi ama cache var, koru
+          setIsLoading(false);
+        }
+      } catch {
+        if (!cancelled) {
+          if (cached) setUser(cached); // hata durumunda cache'i koru
+          setIsLoading(false);
+        }
       }
     };
 
-    // 5s güvenlik ağı
-    const timer = setTimeout(finish, 5000);
+    init();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (cancelled) return;
-
       if (event === 'SIGNED_OUT') {
-        // Tek güvenilir çıkış eventi — sadece burada cache silinir
         clearCache();
         setUser(null);
-        finish();
-        return;
-      }
-
-      if (event === 'INITIAL_SESSION') {
-        if (!session) {
-          // Session yok. Cache de yoksa gerçekten giriş yapılmamış.
-          // Cache VARSA dokunmuyoruz — SIGNED_OUT gelene kadar kullanıcı korunur.
-          if (!loadCache()) setUser(null);
-          finish();
-          return;
-        }
-        // Session var — güncel profili getir
-        const u = await getUserFromSession(session).catch(() => null);
-        if (cancelled) return;
-        if (u) { saveCache(u); setUser(u); }
-        finish();
-        return;
-      }
-
-      if (event === 'TOKEN_REFRESHED' || event === 'SIGNED_IN') {
-        if (!session) return;
+        setIsLoading(false);
+      } else if (event === 'TOKEN_REFRESHED' && session) {
         const u = await getUserFromSession(session).catch(() => null);
         if (!cancelled && u) { saveCache(u); setUser(u); }
-        finish();
       }
     });
 
     return () => {
       cancelled = true;
-      clearTimeout(timer);
       subscription.unsubscribe();
     };
   }, []);
 
-  const loginUser = (userData: User) => {
-    saveCache(userData);
-    setUser(userData);
-  };
+  const loginUser = (u: User) => { saveCache(u); setUser(u); setIsLoading(false); };
 
   const logoutUser = async () => {
     clearCache();
