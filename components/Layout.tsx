@@ -142,6 +142,7 @@ const Layout = ({ children }: { children?: React.ReactNode }) => {
                                                        {notif.type === 'BADGE_EARNED' && '🏆'}
                                                        {notif.type === 'NEW_EPISODE' && '📺'}
                                                        {notif.type === 'FOLLOW' && '👤'}
+                                                       {notif.type === 'ANIME_REQUEST' && '🎌'}
                                                    </div>
                                                    <div>
                                                        <p className="text-xs font-bold text-amber-500 mb-0.5">{notif.title}</p>

@@ -950,10 +950,10 @@ const AdminDashboard = () => {
                   </div>
                   {req.status === 'pending' && (
                     <div className="flex gap-2 flex-shrink-0">
-                      <button onClick={async () => { await updateAnimeRequestStatus(req.id, 'approved'); loadRequests(); }} className="text-xs font-bold px-3 py-1.5 rounded-lg bg-green-500/10 text-green-400 border border-green-500/30 hover:bg-green-500/20 transition-colors">
+                      <button onClick={async () => { try { await updateAnimeRequestStatus(req.id, 'approved'); loadRequests(); } catch(e: any) { alert(e.message); } }} className="text-xs font-bold px-3 py-1.5 rounded-lg bg-green-500/10 text-green-400 border border-green-500/30 hover:bg-green-500/20 transition-colors">
                         Onayla
                       </button>
-                      <button onClick={async () => { await updateAnimeRequestStatus(req.id, 'rejected'); loadRequests(); }} className="text-xs font-bold px-3 py-1.5 rounded-lg bg-red-500/10 text-red-400 border border-red-500/30 hover:bg-red-500/20 transition-colors">
+                      <button onClick={async () => { try { await updateAnimeRequestStatus(req.id, 'rejected'); loadRequests(); } catch(e: any) { alert(e.message); } }} className="text-xs font-bold px-3 py-1.5 rounded-lg bg-red-500/10 text-red-400 border border-red-500/30 hover:bg-red-500/20 transition-colors">
                         Reddet
                       </button>
                     </div>

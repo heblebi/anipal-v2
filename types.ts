@@ -8,7 +8,7 @@ export enum UserRole {
 export interface Notification {
   id: string;
   userId: string;
-  type: 'LEVEL_UP' | 'BADGE_EARNED' | 'NEW_EPISODE' | 'FOLLOW';
+  type: 'LEVEL_UP' | 'BADGE_EARNED' | 'NEW_EPISODE' | 'FOLLOW' | 'ANIME_REQUEST';
   title: string;
   message: string;
   isRead: boolean;

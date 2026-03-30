@@ -693,8 +693,27 @@ export const getAnimeRequests = async (): Promise<import('../types').AnimeReques
 };
 
 export const updateAnimeRequestStatus = async (id: string, status: 'approved' | 'rejected'): Promise<void> => {
+    const { data: req, error: fetchErr } = await supabase.from('anime_requests').select('*').eq('id', id).single();
+    if (fetchErr || !req) throw new Error(fetchErr?.message || 'İstek bulunamadı');
+
     const { error } = await supabase.from('anime_requests').update({ status }).eq('id', id);
     if (error) throw new Error(error.message);
+
+    // Bildirimi kullanıcının profiles.notifications dizisine ekle
+    const { data: profile } = await supabase.from('profiles').select('notifications').eq('id', req.user_id).single();
+    const notifications = profile?.notifications || [];
+    const newNotif = {
+        id: `notif-${Date.now()}`,
+        userId: req.user_id,
+        type: 'ANIME_REQUEST',
+        title: status === 'approved' ? 'Anime İsteğin Onaylandı!' : 'Anime İsteğin Reddedildi',
+        message: status === 'approved'
+            ? `"${req.anime_name}" adlı anime isteğin onaylandı.`
+            : `"${req.anime_name}" adlı anime isteğin reddedildi.`,
+        isRead: false,
+        createdAt: new Date().toISOString(),
+    };
+    await supabase.from('profiles').update({ notifications: [newNotif, ...notifications] }).eq('id', req.user_id);
 };
 
 export const updateUserProfile = async (id: string, data: any): Promise<User> => {
