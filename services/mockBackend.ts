@@ -635,9 +635,20 @@ export const updateUserRole = async (userId: string, newRole: UserRole) => {
 };
 
 export const deleteUser = async (userId: string) => {
-    // Delete profile (cascade will handle related data if set up)
-    const { error } = await supabase.from('profiles').delete().eq('id', userId);
-    if (error) throw new Error(error.message);
+    // Delete auth user via Edge Function (cascades to profile via FK)
+    const { data: { session } } = await supabase.auth.getSession();
+    const token = session?.access_token;
+    if (!token) throw new Error('Oturum bulunamadı');
+
+    const res = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL ?? 'https://btfmgxbrxellkfbsnwzs.supabase.co'}/functions/v1/admin-delete-user`,
+        {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId }),
+        }
+    );
+    if (!res.ok) throw new Error(await res.text());
 };
 
 // ─── Anime Requests ──────────────────────────────────────────────────────────
@@ -726,7 +737,20 @@ export const changeEmail = async (_userId: string, newEmail: string): Promise<Us
 };
 
 export const deleteAccount = async (id: string) => {
-    await supabase.from('profiles').delete().eq('id', id);
+    // Delete auth user via Edge Function (cascades to profile)
+    const { data: { session } } = await supabase.auth.getSession();
+    const token = session?.access_token;
+    if (!token) throw new Error('Oturum bulunamadı');
+
+    const res = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL ?? 'https://btfmgxbrxellkfbsnwzs.supabase.co'}/functions/v1/admin-delete-user`,
+        {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId: id }),
+        }
+    );
+    if (!res.ok) throw new Error(await res.text());
 };
 
 // ─── Custom Lists ─────────────────────────────────────────────────────────────
