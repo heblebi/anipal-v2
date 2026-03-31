@@ -121,6 +121,8 @@ const mapProfile = (p: any, email?: string): User => ({
     earnedAchievements: p.earned_achievements || [],
     displayedBadges: p.displayed_badges || [],
     notifications: p.notifications || [],
+    allowMessages: p.allow_messages !== false,
+    isPrivate: p.is_private || false,
     createdAt: p.created_at,
 });
 
@@ -728,8 +730,12 @@ export const updateUserProfile = async (id: string, data: any): Promise<User> =>
     return mapProfile(updated);
 };
 
-export const updatePrivacySettings = async (userId: string, settings: { showAnimeList: boolean }) => {
-    await supabase.from('profiles').update({ show_anime_list: settings.showAnimeList }).eq('id', userId);
+export const updatePrivacySettings = async (userId: string, settings: { showAnimeList?: boolean; allowMessages?: boolean; isPrivate?: boolean }) => {
+    const update: any = {};
+    if (settings.showAnimeList !== undefined) update.show_anime_list = settings.showAnimeList;
+    if (settings.allowMessages !== undefined) update.allow_messages = settings.allowMessages;
+    if (settings.isPrivate !== undefined) update.is_private = settings.isPrivate;
+    await supabase.from('profiles').update(update).eq('id', userId);
 };
 
 export const changePassword = async (_userId: string, _oldPass: string, newPass: string) => {

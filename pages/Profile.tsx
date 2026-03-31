@@ -2,10 +2,13 @@ import React, { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { getUserById, getUserComments, updateUserProfile, getAllAchievements, getUserAnimeList, getAnimes, getUserLists, getPublicLists } from '../services/mockBackend';
-import { User, Comment, Achievement, AnimeEntry, AnimeWatchStatus, Anime, UserList } from '../types';
+import { getFriendshipStatus, sendFriendRequest, removeFriend, blockUser, unblockUser } from '../services/socialBackend';
+import { User, Comment, Achievement, AnimeEntry, AnimeWatchStatus, Anime, UserList, Friendship } from '../types';
 import Button from '../components/Button';
 import ImageCropModal from '../components/ImageCropModal';
-import { MessageSquare, PlayCircle, Heart, Edit2, Save, X, Upload, Camera, List, Globe, Lock, Crop } from 'lucide-react';
+import ReportModal from '../components/ReportModal';
+import ChatModal from '../components/ChatModal';
+import { MessageSquare, PlayCircle, Heart, Edit2, Save, X, Upload, Camera, List, Globe, Lock, Crop, UserPlus, UserCheck, UserX, Flag, MessageCircle } from 'lucide-react';
 
 const Profile = () => {
   const { userId } = useParams<{ userId: string }>();
@@ -36,6 +39,12 @@ const Profile = () => {
   const [editDisplayedBadges, setEditDisplayedBadges] = useState<string[]>([]);
   const [saveLoading, setSaveLoading] = useState(false);
 
+  // Social state
+  const [friendship, setFriendship] = useState<Friendship | null>(null);
+  const [friendLoading, setFriendLoading] = useState(false);
+  const [showReport, setShowReport] = useState(false);
+  const [showChat, setShowChat] = useState(false);
+
   // Image upload / crop state
   const [cropModal, setCropModal] = useState<{ src: string; type: 'avatar' | 'banner' } | null>(null);
   const [editAvatarOriginal, setEditAvatarOriginal] = useState('');
@@ -53,6 +62,9 @@ const Profile = () => {
     }
     loadData();
     setAllAchievements(getAllAchievements());
+    if (currentUser && targetId !== currentUser.id) {
+        getFriendshipStatus(targetId).then(setFriendship);
+    }
   }, [targetId]);
 
   const loadData = async () => {
@@ -254,6 +266,12 @@ const Profile = () => {
 
   return (
     <div className="animate-in fade-in duration-500 pb-10">
+      {showReport && profileUser && (
+        <ReportModal type="profile" targetId={profileUser.id} onClose={() => setShowReport(false)} />
+      )}
+      {showChat && profileUser && (
+        <ChatModal onClose={() => setShowChat(false)} initialUserId={profileUser.id} initialUsername={profileUser.displayName || profileUser.username} initialAvatar={profileUser.avatar} />
+      )}
       {cropModal && (
         <ImageCropModal
           imageSrc={cropModal.src}
@@ -412,7 +430,7 @@ const Profile = () => {
                     </div>
                 </div>
 
-                {isOwnProfile && (
+                {isOwnProfile ? (
                     <div>
                         {isEditing ? (
                             <div className="flex gap-2">
@@ -428,6 +446,43 @@ const Profile = () => {
                                 <Edit2 size={14} className="mr-1" /> Düzenle
                             </Button>
                         )}
+                    </div>
+                ) : currentUser && (
+                    <div className="flex flex-wrap gap-2">
+                        {/* Message */}
+                        {profileUser.allowMessages !== false && (
+                            <button onClick={() => setShowChat(true)} className="flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-lg bg-gray-800 text-gray-300 border border-gray-700 hover:border-amber-500 hover:text-amber-400 transition-colors">
+                                <MessageCircle size={13} /> Mesaj
+                            </button>
+                        )}
+                        {/* Friend */}
+                        {!friendship ? (
+                            <button disabled={friendLoading} onClick={async () => { setFriendLoading(true); try { await sendFriendRequest(profileUser.id); setFriendship({ id: 'pending', requesterId: currentUser.id, addresseeId: profileUser.id, status: 'pending', createdAt: new Date().toISOString() }); } catch(e:any) { alert(e.message); } finally { setFriendLoading(false); } }} className="flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-lg bg-amber-500/10 text-amber-400 border border-amber-500/30 hover:bg-amber-500/20 transition-colors disabled:opacity-50">
+                                <UserPlus size={13} /> Arkadaş Ekle
+                            </button>
+                        ) : friendship.status === 'pending' ? (
+                            <span className="flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-lg bg-gray-800 text-gray-400 border border-gray-700">
+                                <UserCheck size={13} /> İstek Gönderildi
+                            </span>
+                        ) : friendship.status === 'accepted' ? (
+                            <button onClick={async () => { await removeFriend(friendship.id); setFriendship(null); }} className="flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-lg bg-green-500/10 text-green-400 border border-green-500/30 hover:bg-red-900/20 hover:text-red-400 hover:border-red-900/30 transition-colors">
+                                <UserCheck size={13} /> Arkadaş
+                            </button>
+                        ) : null}
+                        {/* Block */}
+                        {friendship?.status === 'blocked' && friendship.requesterId === currentUser.id ? (
+                            <button onClick={async () => { await unblockUser(profileUser.id); setFriendship(null); }} className="flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-lg bg-red-900/20 text-red-400 border border-red-900/30 hover:bg-red-900/30 transition-colors">
+                                <UserX size={13} /> Engelli
+                            </button>
+                        ) : friendship?.status !== 'blocked' && (
+                            <button onClick={async () => { if (!window.confirm('Bu kullanıcıyı engellemek istiyor musun?')) return; await blockUser(profileUser.id); setFriendship({ id: 'blocked', requesterId: currentUser.id, addresseeId: profileUser.id, status: 'blocked', createdAt: new Date().toISOString() }); }} className="flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-lg bg-gray-800 text-gray-500 border border-gray-700 hover:text-red-400 hover:border-red-900/30 transition-colors">
+                                <UserX size={13} /> Engelle
+                            </button>
+                        )}
+                        {/* Report */}
+                        <button onClick={() => setShowReport(true)} className="flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-lg bg-gray-800 text-gray-500 border border-gray-700 hover:text-red-400 hover:border-red-900/30 transition-colors">
+                            <Flag size={13} /> Şikayet
+                        </button>
                     </div>
                 )}
             </div>

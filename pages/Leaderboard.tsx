@@ -3,6 +3,7 @@ import { getLeaderboard } from '../services/mockBackend';
 import { User } from '../types';
 import { useAuth } from '../context/AuthContext';
 import { Trophy, Medal, Star } from 'lucide-react';
+import { Link } from 'react-router-dom';
 
 const Leaderboard = () => {
   const [users, setUsers] = useState<User[]>([]);
@@ -61,9 +62,11 @@ const Leaderboard = () => {
                             {getRankIcon(index)}
                         </div>
                         <div className="col-span-6 flex items-center gap-3">
-                            <img src={u.avatar} className="w-10 h-10 rounded-full border border-gray-700" alt="" />
+                            <Link to={`/profile/${u.id}`}>
+                                <img src={u.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${u.username}`} className="w-10 h-10 rounded-full border border-gray-700 hover:border-amber-500 transition-colors object-cover" alt="" />
+                            </Link>
                             <div>
-                                <div className={`font-bold ${currentUser?.id === u.id ? 'text-amber-500' : 'text-white'}`}>{u.username}</div>
+                                <Link to={`/profile/${u.id}`} className={`font-bold hover:text-amber-400 transition-colors ${currentUser?.id === u.id ? 'text-amber-500' : 'text-white'}`}>{u.username}</Link>
                                 <div className="text-xs text-gray-500">{u.earnedAchievements?.length || 0} Başarım</div>
                             </div>
                         </div>

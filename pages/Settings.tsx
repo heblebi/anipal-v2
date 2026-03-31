@@ -30,6 +30,8 @@ const Settings = () => {
 
   // Privacy
   const [showAnimeList, setShowAnimeList] = useState(true);
+  const [allowMessages, setAllowMessages] = useState(true);
+  const [isPrivate, setIsPrivate] = useState(false);
 
   // Danger Zone
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -39,6 +41,8 @@ const Settings = () => {
       setNewUsername(user.username);
       setNewEmail(user.email);
       setShowAnimeList(user.showAnimeList !== false);
+      setAllowMessages(user.allowMessages !== false);
+      setIsPrivate(user.isPrivate || false);
     }
   }, [user]);
 
@@ -100,6 +104,20 @@ const Settings = () => {
     setShowAnimeList(newVal);
     updateUser({ showAnimeList: newVal });
     await updatePrivacySettings(user.id, { showAnimeList: newVal });
+  };
+
+  const handleToggleMessages = async () => {
+    const newVal = !allowMessages;
+    setAllowMessages(newVal);
+    updateUser({ allowMessages: newVal });
+    await updatePrivacySettings(user.id, { allowMessages: newVal });
+  };
+
+  const handleTogglePrivate = async () => {
+    const newVal = !isPrivate;
+    setIsPrivate(newVal);
+    updateUser({ isPrivate: newVal });
+    await updatePrivacySettings(user.id, { isPrivate: newVal });
   };
 
   const handleDeleteAccount = async () => {
@@ -204,17 +222,34 @@ const Settings = () => {
           <Eye className="text-blue-400" size={20} />
           <h2 className="text-xl font-bold text-gray-200">Gizlilik</h2>
         </div>
-        <div className="flex items-center justify-between p-4 bg-gray-900 rounded-lg border border-gray-800">
-          <div>
-            <p className="text-white font-medium">Anime Listem</p>
-            <p className="text-gray-500 text-sm">Puanlamaların ve anime listenin profilinde görünsün</p>
+        <div className="space-y-3">
+          <div className="flex items-center justify-between p-4 bg-gray-900 rounded-lg border border-gray-800">
+            <div>
+              <p className="text-white font-medium">Anime Listem</p>
+              <p className="text-gray-500 text-sm">Puanlamaların ve anime listenin profilinde görünsün</p>
+            </div>
+            <button onClick={handleToggleAnimeList} className={`relative w-12 h-6 rounded-full transition-colors ${showAnimeList ? 'bg-amber-500' : 'bg-gray-700'}`}>
+              <div className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-transform ${showAnimeList ? 'translate-x-7' : 'translate-x-1'}`} />
+            </button>
           </div>
-          <button
-            onClick={handleToggleAnimeList}
-            className={`relative w-12 h-6 rounded-full transition-colors ${showAnimeList ? 'bg-amber-500' : 'bg-gray-700'}`}
-          >
-            <div className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-transform ${showAnimeList ? 'translate-x-7' : 'translate-x-1'}`} />
-          </button>
+          <div className="flex items-center justify-between p-4 bg-gray-900 rounded-lg border border-gray-800">
+            <div>
+              <p className="text-white font-medium">Mesaj Al</p>
+              <p className="text-gray-500 text-sm">Diğer kullanıcılar sana mesaj gönderebilsin</p>
+            </div>
+            <button onClick={handleToggleMessages} className={`relative w-12 h-6 rounded-full transition-colors ${allowMessages ? 'bg-amber-500' : 'bg-gray-700'}`}>
+              <div className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-transform ${allowMessages ? 'translate-x-7' : 'translate-x-1'}`} />
+            </button>
+          </div>
+          <div className="flex items-center justify-between p-4 bg-gray-900 rounded-lg border border-gray-800">
+            <div>
+              <p className="text-white font-medium">Gizli Profil</p>
+              <p className="text-gray-500 text-sm">Profilin sadece arkadaşlarına görünsün</p>
+            </div>
+            <button onClick={handleTogglePrivate} className={`relative w-12 h-6 rounded-full transition-colors ${isPrivate ? 'bg-amber-500' : 'bg-gray-700'}`}>
+              <div className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-transform ${isPrivate ? 'translate-x-7' : 'translate-x-1'}`} />
+            </button>
+          </div>
         </div>
       </div>
 

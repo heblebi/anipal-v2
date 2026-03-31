@@ -5,6 +5,8 @@ import { useNavigate } from 'react-router-dom';
 import Input from '../components/Input';
 import Button from '../components/Button';
 import { addEpisodes, getAnimes, getSiteStats, getUsers, toggleBanUser, approveAnime, updateUserRole, deleteAnime, deleteEpisode, updateEpisode, getNews, createNews, updateNews, deleteNews, approveNews, fetchANNArticle, getAnimeRequests, updateAnimeRequestStatus, deleteUser } from '../services/mockBackend';
+import { getReports, updateReportStatus } from '../services/socialBackend';
+import type { Report } from '../types';
 
 interface EmbedResult {
   source: string;
@@ -15,7 +17,7 @@ interface EmbedResult {
   error?: string;
   url?: string;
 }
-import { Activity, Download, Users, CheckCircle, ShieldAlert, PlaySquare, Search, Shield, Plus, Trash2, Image, ChevronDown, ChevronRight, Pencil, X, Save, Globe, Loader2, CheckCircle2, AlertCircle, ImageIcon, Upload, Send, UserX } from 'lucide-react';
+import { Activity, Download, Users, CheckCircle, ShieldAlert, PlaySquare, Search, Shield, Plus, Trash2, Image, ChevronDown, ChevronRight, Pencil, X, Save, Globe, Loader2, CheckCircle2, AlertCircle, ImageIcon, Upload, Send, UserX, Flag } from 'lucide-react';
 import ImageCropModal from '../components/ImageCropModal';
 import { SITE_ASSETS, SiteAsset } from '../services/siteSettings';
 import { useSiteSettings } from '../context/SiteSettingsContext';
@@ -33,13 +35,15 @@ const AdminDashboard = () => {
   const { user, isLoading: authLoading } = useAuth();
   const navigate = useNavigate();
   const isEditor = user?.role === UserRole.EDITOR;
-  const [activeTab, setActiveTab] = useState<'stats' | 'episodes' | 'moderation' | 'users' | 'manage' | 'news' | 'assets' | 'requests'>(isEditor ? 'news' : 'stats');
+  const [activeTab, setActiveTab] = useState<'stats' | 'episodes' | 'moderation' | 'users' | 'manage' | 'news' | 'assets' | 'requests' | 'reports'>(isEditor ? 'news' : 'stats');
   const { settings: siteSettings, uploadAndSave } = useSiteSettings();
   const [assetCrop, setAssetCrop] = useState<{ src: string; asset: SiteAsset } | null>(null);
   const [assetSaving, setAssetSaving] = useState<string | null>(null);
   const [assetMsg, setAssetMsg] = useState<{ key: string; type: 'success' | 'error'; text: string } | null>(null);
   const [requests, setRequests] = useState<AnimeRequest[]>([]);
   const [requestsLoading, setRequestsLoading] = useState(false);
+  const [reports, setReports] = useState<Report[]>([]);
+  const [reportsLoading, setReportsLoading] = useState(false);
   const assetFileRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const [animes, setAnimes] = useState<Anime[]>([]);
   const [stats, setStats] = useState<SiteStats | null>(null);
@@ -425,6 +429,7 @@ const AdminDashboard = () => {
                 <TabButton active={activeTab==='manage'} onClick={()=>setActiveTab('manage')} icon={<Trash2 size={18}/>}>Düzenle & Sil</TabButton>
                 <TabButton active={activeTab==='assets'} onClick={()=>setActiveTab('assets')} icon={<ImageIcon size={18}/>}>Site Görselleri</TabButton>
                 <TabButton active={activeTab==='requests'} onClick={()=>{ setActiveTab('requests'); loadRequests(); }} icon={<Send size={18}/>}>İstekler</TabButton>
+                <TabButton active={activeTab==='reports'} onClick={async ()=>{ setActiveTab('reports'); setReportsLoading(true); try { setReports(await getReports()); } catch { } finally { setReportsLoading(false); } }} icon={<Flag size={18}/>}>Şikayetler</TabButton>
              </>
           )}
       </div>
@@ -956,6 +961,44 @@ const AdminDashboard = () => {
                       <button onClick={async () => { try { await updateAnimeRequestStatus(req.id, 'rejected'); loadRequests(); } catch(e: any) { alert(e.message); } }} className="text-xs font-bold px-3 py-1.5 rounded-lg bg-red-500/10 text-red-400 border border-red-500/30 hover:bg-red-500/20 transition-colors">
                         Reddet
                       </button>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {activeTab === 'reports' && (
+        <div className="space-y-4">
+          <h2 className="text-lg font-bold text-white flex items-center gap-2"><Flag size={18} className="text-red-400" /> Şikayetler</h2>
+          {reportsLoading ? (
+            <div className="text-gray-500 text-sm">Yükleniyor...</div>
+          ) : reports.length === 0 ? (
+            <div className="text-center py-12 text-gray-600 text-sm">Şikayet yok.</div>
+          ) : (
+            <div className="space-y-3">
+              {reports.map(r => (
+                <div key={r.id} className="bg-[#18181b] border border-gray-800 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center gap-4">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${r.type === 'profile' ? 'bg-purple-500/10 text-purple-400 border-purple-500/30' : 'bg-blue-500/10 text-blue-400 border-blue-500/30'}`}>
+                        {r.type === 'profile' ? 'Profil' : 'Yorum'}
+                      </span>
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${r.status === 'pending' ? 'bg-amber-500/10 text-amber-400 border-amber-500/30' : r.status === 'resolved' ? 'bg-green-500/10 text-green-400 border-green-500/30' : 'bg-gray-700 text-gray-500 border-gray-700'}`}>
+                        {r.status === 'pending' ? 'Bekliyor' : r.status === 'resolved' ? 'Çözüldü' : 'Reddedildi'}
+                      </span>
+                    </div>
+                    <p className="text-sm text-white"><span className="text-gray-400">Şikayet eden:</span> {r.reporterUsername || r.reporterId.slice(0, 8)}</p>
+                    <p className="text-sm text-white"><span className="text-gray-400">Şikayet edilen:</span> {r.reportedUsername || r.reportedUserId?.slice(0, 8) || '-'}</p>
+                    <p className="text-sm text-gray-300 mt-1 italic">"{r.reason}"</p>
+                    <p className="text-xs text-gray-600 mt-1">{new Date(r.createdAt).toLocaleDateString('tr-TR')}</p>
+                  </div>
+                  {r.status === 'pending' && (
+                    <div className="flex gap-2 flex-shrink-0">
+                      <button onClick={async () => { await updateReportStatus(r.id, 'resolved'); setReports(prev => prev.map(x => x.id === r.id ? {...x, status: 'resolved'} : x)); }} className="text-xs font-bold px-3 py-1.5 rounded-lg bg-green-500/10 text-green-400 border border-green-500/30 hover:bg-green-500/20 transition-colors">Çözüldü</button>
+                      <button onClick={async () => { await updateReportStatus(r.id, 'dismissed'); setReports(prev => prev.map(x => x.id === r.id ? {...x, status: 'dismissed'} : x)); }} className="text-xs font-bold px-3 py-1.5 rounded-lg bg-gray-700 text-gray-400 border border-gray-600 hover:bg-gray-600 transition-colors">Reddet</button>
                     </div>
                   )}
                 </div>

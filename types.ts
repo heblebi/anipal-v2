@@ -54,7 +54,7 @@ export interface User {
   avatar?: string;
   coverImage?: string;
   bio?: string;
-  watchedEpisodes?: string[]; 
+  watchedEpisodes?: string[];
   likedEpisodes?: string[];
   watchlist?: string[]; // Anime IDs
   animeList?: AnimeEntry[];
@@ -68,6 +68,9 @@ export interface User {
   earnedAchievements: string[]; // Achievement IDs
   displayedBadges?: string[]; // Up to 5 badge IDs shown on profile
   notifications: Notification[];
+  // Privacy & Social
+  allowMessages?: boolean;
+  isPrivate?: boolean;
 }
 
 export interface VideoSource {
@@ -172,5 +175,48 @@ export interface AnimeRequest {
   animeName: string;
   note?: string;
   status: 'pending' | 'approved' | 'rejected';
+  createdAt: string;
+}
+
+export interface Friendship {
+  id: string;
+  requesterId: string;
+  addresseeId: string;
+  status: 'pending' | 'accepted' | 'blocked';
+  createdAt: string;
+  // Populated fields
+  requester?: { id: string; username: string; displayName?: string; avatar?: string };
+  addressee?: { id: string; username: string; displayName?: string; avatar?: string };
+}
+
+export interface Message {
+  id: string;
+  senderId: string;
+  receiverId: string;
+  content: string;
+  isRead: boolean;
+  createdAt: string;
+}
+
+export interface Conversation {
+  userId: string;
+  username: string;
+  displayName?: string;
+  avatar?: string;
+  lastMessage: string;
+  lastMessageAt: string;
+  unreadCount: number;
+}
+
+export interface Report {
+  id: string;
+  reporterId: string;
+  reporterUsername?: string;
+  reportedUserId?: string;
+  reportedUsername?: string;
+  commentId?: string;
+  reason: string;
+  type: 'profile' | 'comment';
+  status: 'pending' | 'resolved' | 'dismissed';
   createdAt: string;
 }

@@ -3,16 +3,19 @@ import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import Button from './Button';
 import { UserRole, Notification } from '../types';
-import { LogOut, Menu, X, Settings, User as UserIcon, Search, Bell, ChevronDown, Send } from 'lucide-react';
+import { LogOut, Menu, X, Settings, User as UserIcon, Search, Bell, ChevronDown, Send, MessageCircle, Users, UserCheck, UserPlus, Check } from 'lucide-react';
 import { useSiteSettings } from '../context/SiteSettingsContext';
 import { getNotifications, markNotificationsAsRead } from '../services/mockBackend';
+import { getConversations, getTotalUnreadMessages, getFriends, getPendingRequests, acceptFriendRequest, rejectFriendRequest } from '../services/socialBackend';
+import ChatModal from './ChatModal';
+import type { Conversation, Friendship } from '../types';
 
 const Layout = ({ children }: { children?: React.ReactNode }) => {
   const { user, isAuthenticated, logoutUser } = useAuth();
   const { settings: siteSettings } = useSiteSettings();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false);
   const [scrolled, setScrolled] = useState(false);
-  
+
   // Notification State
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [showNotifs, setShowNotifs] = useState(false);
@@ -21,6 +24,16 @@ const Layout = ({ children }: { children?: React.ReactNode }) => {
   // Profile dropdown
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const profileMenuRef = useRef<HTMLDivElement>(null);
+
+  // Chat
+  const [showChat, setShowChat] = useState(false);
+  const [unreadMsgs, setUnreadMsgs] = useState(0);
+
+  // Friends tab in profile menu
+  const [profileTab, setProfileTab] = useState<'menu' | 'friends'>('menu');
+  const [friends, setFriends] = useState<Friendship[]>([]);
+  const [pendingReqs, setPendingReqs] = useState<Friendship[]>([]);
+  const [friendsLoading, setFriendsLoading] = useState(false);
 
   const location = useLocation();
 
@@ -50,9 +63,43 @@ const Layout = ({ children }: { children?: React.ReactNode }) => {
       return () => clearInterval(interval);
   }, [user]);
 
+  // Poll unread messages
+  useEffect(() => {
+      if (!user) return;
+      const fetchUnread = async () => {
+          try { setUnreadMsgs(await getTotalUnreadMessages()); } catch { /* ignore */ }
+      };
+      fetchUnread();
+      const interval = setInterval(fetchUnread, 30000);
+      return () => clearInterval(interval);
+  }, [user]);
+
+  const loadFriends = async () => {
+      if (!user) return;
+      setFriendsLoading(true);
+      try {
+          const [f, p] = await Promise.all([getFriends(user.id), getPendingRequests(user.id)]);
+          setFriends(f);
+          setPendingReqs(p);
+      } catch { /* ignore */ } finally {
+          setFriendsLoading(false);
+      }
+  };
+
   const handleLogout = () => {
     logoutUser();
     setShowProfileMenu(false);
+    setProfileTab('menu');
+  };
+
+  const handleOpenProfileMenu = (v: boolean) => {
+    setShowProfileMenu(v);
+    if (v) { setProfileTab('menu'); }
+  };
+
+  const handleOpenFriendsTab = () => {
+    setProfileTab('friends');
+    loadFriends();
   };
 
   // Close profile menu on outside click
@@ -160,9 +207,19 @@ const Layout = ({ children }: { children?: React.ReactNode }) => {
                        )}
                    </div>
 
+                   {/* Chat Icon */}
+                   <div className="relative">
+                       <button onClick={() => setShowChat(true)} className="relative p-2 text-gray-300 hover:text-white">
+                           <MessageCircle size={20} />
+                           {unreadMsgs > 0 && (
+                               <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-amber-500 rounded-full border border-[#0f0f10]"></span>
+                           )}
+                       </button>
+                   </div>
+
                    <div className="relative" ref={profileMenuRef}>
                       <button
-                        onClick={() => setShowProfileMenu(v => !v)}
+                        onClick={() => handleOpenProfileMenu(!showProfileMenu)}
                         className="flex items-center gap-2 hover:opacity-80 transition-opacity"
                       >
                         <img
@@ -178,41 +235,82 @@ const Layout = ({ children }: { children?: React.ReactNode }) => {
                       </button>
 
                       {showProfileMenu && (
-                        <div className="absolute right-0 mt-3 w-48 bg-[#18181b] border border-gray-800 rounded-xl shadow-2xl overflow-hidden animate-in fade-in slide-in-from-top-2 z-50">
-                          <div className="p-3 border-b border-gray-800">
-                            <p className="text-xs font-bold text-white truncate">{user.displayName || user.username}</p>
-                            <p className="text-[10px] text-gray-500">@{user.username}</p>
-                            <p className="text-[10px] text-amber-500">Seviye {user.level} · {user.xp} XP</p>
-                          </div>
-                          <Link
-                            to="/profile"
-                            onClick={() => setShowProfileMenu(false)}
-                            className="flex items-center gap-3 px-4 py-3 text-sm text-gray-300 hover:bg-gray-800 hover:text-white transition-colors"
-                          >
-                            <UserIcon size={15} /> Profil
-                          </Link>
-                          <Link
-                            to="/settings"
-                            onClick={() => setShowProfileMenu(false)}
-                            className="flex items-center gap-3 px-4 py-3 text-sm text-gray-300 hover:bg-gray-800 hover:text-white transition-colors"
-                          >
-                            <Settings size={15} /> Ayarlar
-                          </Link>
-                          <Link
-                            to="/request"
-                            onClick={() => setShowProfileMenu(false)}
-                            className="flex items-center gap-3 px-4 py-3 text-sm text-gray-300 hover:bg-gray-800 hover:text-white transition-colors"
-                          >
-                            <Send size={15} /> İstek / Öneri
-                          </Link>
-                          <div className="border-t border-gray-800">
-                            <button
-                              onClick={handleLogout}
-                              className="w-full flex items-center gap-3 px-4 py-3 text-sm text-red-400 hover:bg-red-900/20 hover:text-red-300 transition-colors"
-                            >
-                              <LogOut size={15} /> Çıkış Yap
-                            </button>
-                          </div>
+                        <div className="absolute right-0 mt-3 w-64 bg-[#18181b] border border-gray-800 rounded-xl shadow-2xl overflow-hidden animate-in fade-in slide-in-from-top-2 z-50">
+                          {profileTab === 'menu' ? (
+                            <>
+                              <div className="p-3 border-b border-gray-800">
+                                <p className="text-xs font-bold text-white truncate">{user.displayName || user.username}</p>
+                                <p className="text-[10px] text-gray-500">@{user.username}</p>
+                                <p className="text-[10px] text-amber-500">Seviye {user.level} · {user.xp} XP</p>
+                              </div>
+                              <Link to="/profile" onClick={() => setShowProfileMenu(false)} className="flex items-center gap-3 px-4 py-3 text-sm text-gray-300 hover:bg-gray-800 hover:text-white transition-colors">
+                                <UserIcon size={15} /> Profil
+                              </Link>
+                              <button onClick={handleOpenFriendsTab} className="w-full flex items-center gap-3 px-4 py-3 text-sm text-gray-300 hover:bg-gray-800 hover:text-white transition-colors">
+                                <Users size={15} /> Arkadaşlar
+                                {pendingReqs.length > 0 && <span className="ml-auto bg-amber-500 text-black text-[10px] font-black px-1.5 py-0.5 rounded-full">{pendingReqs.length}</span>}
+                              </button>
+                              <Link to="/settings" onClick={() => setShowProfileMenu(false)} className="flex items-center gap-3 px-4 py-3 text-sm text-gray-300 hover:bg-gray-800 hover:text-white transition-colors">
+                                <Settings size={15} /> Ayarlar
+                              </Link>
+                              <Link to="/request" onClick={() => setShowProfileMenu(false)} className="flex items-center gap-3 px-4 py-3 text-sm text-gray-300 hover:bg-gray-800 hover:text-white transition-colors">
+                                <Send size={15} /> İstek / Öneri
+                              </Link>
+                              <div className="border-t border-gray-800">
+                                <button onClick={handleLogout} className="w-full flex items-center gap-3 px-4 py-3 text-sm text-red-400 hover:bg-red-900/20 hover:text-red-300 transition-colors">
+                                  <LogOut size={15} /> Çıkış Yap
+                                </button>
+                              </div>
+                            </>
+                          ) : (
+                            <>
+                              {/* Friends Tab */}
+                              <div className="flex items-center gap-2 px-4 py-3 border-b border-gray-800">
+                                <button onClick={() => setProfileTab('menu')} className="text-gray-500 hover:text-white text-xs">← Geri</button>
+                                <span className="font-bold text-sm text-white">Arkadaşlar</span>
+                              </div>
+                              <div className="max-h-80 overflow-y-auto">
+                                {friendsLoading ? (
+                                  <div className="p-4 text-center text-xs text-gray-500">Yükleniyor...</div>
+                                ) : (
+                                  <>
+                                    {pendingReqs.length > 0 && (
+                                      <div className="px-3 py-2 bg-amber-500/5 border-b border-gray-800">
+                                        <p className="text-[10px] font-bold text-amber-500 uppercase mb-2">İstekler ({pendingReqs.length})</p>
+                                        {pendingReqs.map(req => (
+                                          <div key={req.id} className="flex items-center gap-2 mb-2">
+                                            <img src={req.requester?.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${req.requester?.username}`} className="w-7 h-7 rounded-full object-cover" alt="" />
+                                            <span className="text-xs text-white flex-1 truncate">{req.requester?.displayName || req.requester?.username}</span>
+                                            <button onClick={async () => { await acceptFriendRequest(req.id); loadFriends(); }} className="p-1 text-green-400 hover:text-green-300"><Check size={14} /></button>
+                                            <button onClick={async () => { await rejectFriendRequest(req.id); loadFriends(); }} className="p-1 text-red-400 hover:text-red-300"><X size={14} /></button>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    )}
+                                    {friends.length === 0 && pendingReqs.length === 0 ? (
+                                      <div className="p-4 text-center text-xs text-gray-500">Henüz arkadaşın yok.</div>
+                                    ) : friends.length > 0 && (
+                                      <div className="p-2">
+                                        <p className="text-[10px] font-bold text-gray-500 uppercase px-2 mb-2">Arkadaşlar ({friends.length})</p>
+                                        {friends.map(f => {
+                                          const other = f.requesterId === user.id ? f.addressee : f.requester;
+                                          return (
+                                            <Link key={f.id} to={`/profile/${other?.id}`} onClick={() => setShowProfileMenu(false)} className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-gray-800 transition-colors">
+                                              <img src={other?.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${other?.username}`} className="w-7 h-7 rounded-full object-cover" alt="" />
+                                              <div className="min-w-0">
+                                                <p className="text-xs text-white font-medium truncate">{other?.displayName || other?.username}</p>
+                                                <p className="text-[10px] text-gray-500">@{other?.username}</p>
+                                              </div>
+                                            </Link>
+                                          );
+                                        })}
+                                      </div>
+                                    )}
+                                  </>
+                                )}
+                              </div>
+                            </>
+                          )}
                         </div>
                       )}
                    </div>
@@ -306,6 +404,9 @@ const Layout = ({ children }: { children?: React.ReactNode }) => {
           </div>
         )}
       </nav>
+
+      {/* Chat Modal */}
+      {showChat && <ChatModal onClose={() => { setShowChat(false); setUnreadMsgs(0); }} />}
 
       {/* Main Content */}
       <main className="flex-grow w-full">
