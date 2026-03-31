@@ -6,7 +6,7 @@ import { UserRole, Notification } from '../types';
 import { LogOut, Menu, X, Settings, User as UserIcon, Search, Bell, ChevronDown, Send, MessageCircle, Users, UserCheck, UserPlus, Check } from 'lucide-react';
 import { useSiteSettings } from '../context/SiteSettingsContext';
 import { getNotifications, markNotificationsAsRead } from '../services/mockBackend';
-import { getConversations, getTotalUnreadMessages, getFriends, getPendingRequests, acceptFriendRequest, rejectFriendRequest } from '../services/socialBackend';
+import { getConversations, getTotalUnreadMessages, getFriends, getPendingRequests, acceptFriendRequest, rejectFriendRequest, searchUsers, sendFriendRequest } from '../services/socialBackend';
 import ChatModal from './ChatModal';
 import type { Conversation, Friendship } from '../types';
 
@@ -34,6 +34,10 @@ const Layout = ({ children }: { children?: React.ReactNode }) => {
   const [friends, setFriends] = useState<Friendship[]>([]);
   const [pendingReqs, setPendingReqs] = useState<Friendship[]>([]);
   const [friendsLoading, setFriendsLoading] = useState(false);
+  const [friendSearch, setFriendSearch] = useState('');
+  const [searchResults, setSearchResults] = useState<import('../types').User[]>([]);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const friendSearchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const location = useLocation();
 
@@ -99,7 +103,24 @@ const Layout = ({ children }: { children?: React.ReactNode }) => {
 
   const handleOpenFriendsTab = () => {
     setProfileTab('friends');
+    setFriendSearch('');
+    setSearchResults([]);
     loadFriends();
+  };
+
+  const handleFriendSearch = (q: string) => {
+    setFriendSearch(q);
+    if (friendSearchTimer.current) clearTimeout(friendSearchTimer.current);
+    if (!q.trim()) { setSearchResults([]); return; }
+    setSearchLoading(true);
+    friendSearchTimer.current = setTimeout(async () => {
+      try {
+        const results = await searchUsers(q);
+        setSearchResults(results.filter(r => r.id !== user?.id));
+      } catch { /* ignore */ } finally {
+        setSearchLoading(false);
+      }
+    }, 400);
   };
 
   // Close profile menu on outside click
@@ -266,11 +287,52 @@ const Layout = ({ children }: { children?: React.ReactNode }) => {
                             <>
                               {/* Friends Tab */}
                               <div className="flex items-center gap-2 px-4 py-3 border-b border-gray-800">
-                                <button onClick={() => setProfileTab('menu')} className="text-gray-500 hover:text-white text-xs">← Geri</button>
+                                <button onClick={() => setProfileTab('menu')} className="text-gray-500 hover:text-white text-xs flex-shrink-0">← Geri</button>
                                 <span className="font-bold text-sm text-white">Arkadaşlar</span>
                               </div>
-                              <div className="max-h-80 overflow-y-auto">
-                                {friendsLoading ? (
+                              {/* Search */}
+                              <div className="px-3 py-2 border-b border-gray-800">
+                                <div className="relative">
+                                  <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
+                                  <input
+                                    className="w-full bg-gray-800 border border-gray-700 rounded-lg pl-8 pr-3 py-1.5 text-xs text-white placeholder-gray-500 focus:border-amber-500 focus:outline-none"
+                                    placeholder="Kullanıcı ara..."
+                                    value={friendSearch}
+                                    onChange={e => handleFriendSearch(e.target.value)}
+                                  />
+                                </div>
+                              </div>
+                              <div className="max-h-72 overflow-y-auto">
+                                {friendSearch.trim() ? (
+                                  searchLoading ? (
+                                    <div className="p-4 text-center text-xs text-gray-500">Aranıyor...</div>
+                                  ) : searchResults.length === 0 ? (
+                                    <div className="p-4 text-center text-xs text-gray-500">Kullanıcı bulunamadı.</div>
+                                  ) : (
+                                    <div className="p-2">
+                                      {searchResults.map(u => {
+                                        const isFriend = friends.some(f => f.requesterId === u.id || f.addresseeId === u.id);
+                                        return (
+                                          <div key={u.id} className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-gray-800 transition-colors">
+                                            <Link to={`/profile/${u.id}`} onClick={() => setShowProfileMenu(false)} className="flex items-center gap-2 flex-1 min-w-0">
+                                              <img src={u.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${u.username}`} className="w-7 h-7 rounded-full object-cover flex-shrink-0" alt="" />
+                                              <div className="min-w-0">
+                                                <p className="text-xs text-white font-medium truncate">{u.displayName || u.username}</p>
+                                                <p className="text-[10px] text-gray-500">@{u.username}</p>
+                                              </div>
+                                            </Link>
+                                            {!isFriend && (
+                                              <button onClick={async () => { try { await sendFriendRequest(u.id); } catch { /* ignore */ } loadFriends(); }} className="p-1 text-amber-400 hover:text-amber-300 flex-shrink-0" title="Arkadaş ekle">
+                                                <UserPlus size={14} />
+                                              </button>
+                                            )}
+                                            {isFriend && <UserCheck size={14} className="text-green-400 flex-shrink-0" />}
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                  )
+                                ) : friendsLoading ? (
                                   <div className="p-4 text-center text-xs text-gray-500">Yükleniyor...</div>
                                 ) : (
                                   <>
