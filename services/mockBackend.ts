@@ -150,6 +150,7 @@ const mapProfile = (p: any, email?: string): User => ({
     xp: p.xp || 0,
     level: p.level || 1,
     isBanned: p.is_banned || false,
+    banExpiresAt: p.ban_expires_at || null,
     showAnimeList: p.show_anime_list !== false,
     watchlist: p.watchlist || [],
     watchedEpisodes: p.watched_episodes || [],
@@ -309,7 +310,18 @@ export const login = async (emailOrUsername: string, password: string): Promise<
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) throw new Error('Geçersiz kullanıcı adı veya şifre');
     const profile = await fetchProfile(data.user.id);
-    if (profile.is_banned) { await supabase.auth.signOut(); throw new Error('Bu hesap engellenmiştir.'); }
+    if (profile.is_banned) {
+        // Süreli ban bittiyse otomatik kaldır
+        if (profile.ban_expires_at && new Date(profile.ban_expires_at) <= new Date()) {
+            await supabase.from('profiles').update({ is_banned: false, ban_expires_at: null }).eq('id', data.user.id);
+        } else {
+            await supabase.auth.signOut();
+            const expiryMsg = profile.ban_expires_at
+                ? `Bu hesap ${new Date(profile.ban_expires_at).toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })} tarihine kadar yasaklıdır.`
+                : 'Bu hesap kalıcı olarak engellenmiştir.';
+            throw new Error(expiryMsg);
+        }
+    }
     const user = mapProfile(profile, email);
     // Daily login XP (fire and forget)
     grantLoginXP(data.user.id).catch(() => {});
@@ -350,8 +362,13 @@ export const getUserFromSession = async (session: { user: { id: string; email?: 
         try {
             const profile = await fetchProfile(session.user.id);
             if (profile.is_banned) {
-                await supabase.auth.signOut();
-                return null;
+                // Süre bittiyse otomatik kaldır
+                if (profile.ban_expires_at && new Date(profile.ban_expires_at) <= new Date()) {
+                    await supabase.from('profiles').update({ is_banned: false, ban_expires_at: null }).eq('id', session.user.id);
+                } else {
+                    await supabase.auth.signOut();
+                    return null;
+                }
             }
             return mapProfile(profile, session.user.email);
         } catch {
@@ -763,7 +780,7 @@ export const getSiteStats = async (): Promise<SiteStats> => {
 
 export const getUsers = async (): Promise<User[]> => {
     const { data } = await supabase.from('profiles')
-        .select('id,username,display_name,email,role,xp,level,is_banned,created_at,bio,cover_image,watchlist,watched_episodes,liked_episodes,anime_list,custom_lists,earned_achievements,displayed_badges,notifications,show_anime_list')
+        .select('id,username,display_name,email,role,xp,level,is_banned,ban_expires_at,created_at,bio,cover_image,watchlist,watched_episodes,liked_episodes,anime_list,custom_lists,earned_achievements,displayed_badges,notifications,show_anime_list')
         .order('created_at', { ascending: false });
     return (data || []).map(p => mapProfile(p));
 };
@@ -772,9 +789,24 @@ export const getUserById = async (id: string): Promise<User | null> => {
     try { return mapProfile(await fetchProfile(id)); } catch { return null; }
 };
 
+// durationDays: gün sayısı (1,3,7,30,365...) veya null = kalıcı
+export const banUser = async (id: string, durationDays: number | null) => {
+    const expiresAt = durationDays ? new Date(Date.now() + durationDays * 86400000).toISOString() : null;
+    await supabase.from('profiles').update({ is_banned: true, ban_expires_at: expiresAt }).eq('id', id);
+};
+
+export const unbanUser = async (id: string) => {
+    await supabase.from('profiles').update({ is_banned: false, ban_expires_at: null }).eq('id', id);
+};
+
+/** @deprecated use banUser/unbanUser */
 export const toggleBanUser = async (id: string) => {
     const profile = await fetchProfile(id);
-    await supabase.from('profiles').update({ is_banned: !profile.is_banned }).eq('id', id);
+    if (profile.is_banned) {
+        await unbanUser(id);
+    } else {
+        await banUser(id, null);
+    }
 };
 
 export const updateUserRole = async (userId: string, newRole: UserRole) => {

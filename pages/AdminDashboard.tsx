@@ -4,7 +4,7 @@ import { UserRole, Anime, User, AnimeStatus, SiteStats, NewsItem, AnimeRequest }
 import { useNavigate } from 'react-router-dom';
 import Input from '../components/Input';
 import Button from '../components/Button';
-import { addEpisodes, getAnimes, getSiteStats, getUsers, toggleBanUser, approveAnime, updateUserRole, deleteAnime, deleteEpisode, updateEpisode, getNews, createNews, updateNews, deleteNews, approveNews, fetchANNArticle, getAnimeRequests, updateAnimeRequestStatus, deleteUser } from '../services/mockBackend';
+import { addEpisodes, getAnimes, getSiteStats, getUsers, banUser, unbanUser, approveAnime, updateUserRole, deleteAnime, deleteEpisode, updateEpisode, getNews, createNews, updateNews, deleteNews, approveNews, fetchANNArticle, getAnimeRequests, updateAnimeRequestStatus, deleteUser } from '../services/mockBackend';
 import { getReports, updateReportStatus } from '../services/socialBackend';
 import type { Report } from '../types';
 
@@ -51,6 +51,10 @@ const AdminDashboard = () => {
 
   // User Search
   const [userSearch, setUserSearch] = useState('');
+
+  // Ban modal
+  const [banModal, setBanModal] = useState<{ userId: string; username: string } | null>(null);
+  const [banDuration, setBanDuration] = useState<string>('7');
 
   // Manage tab
   const [expandedAnimeId, setExpandedAnimeId] = useState<string | null>(null);
@@ -286,10 +290,22 @@ const AdminDashboard = () => {
       setMsg({ type: 'success', text: 'Anime onaylandı.' });
   };
 
-  const handleBan = async (uid: string) => {
+  const handleUnban = async (uid: string) => {
       try {
-        await toggleBanUser(uid);
-        loadData();
+          await unbanUser(uid);
+          loadData();
+      } catch (e: any) {
+          alert(e.message);
+      }
+  };
+
+  const handleBanConfirm = async () => {
+      if (!banModal) return;
+      try {
+          const days = banDuration === 'permanent' ? null : parseInt(banDuration, 10);
+          await banUser(banModal.userId, days);
+          setBanModal(null);
+          loadData();
       } catch (e: any) {
           alert(e.message);
       }
@@ -840,14 +856,25 @@ const AdminDashboard = () => {
                                </div>
                                <div className="ml-auto flex-shrink-0 flex flex-col items-end gap-1">
                                    <span className={`px-2 py-0.5 rounded text-xs uppercase font-bold ${u.role === UserRole.ADMIN ? 'bg-red-900/30 text-red-500' : u.role === UserRole.MODERATOR ? 'bg-amber-900/30 text-amber-500' : 'bg-gray-800 text-gray-400'}`}>{u.role}</span>
-                                   {u.isBanned ? <span className="text-red-500 text-xs font-bold">BANLI</span> : <span className="text-green-500 text-xs font-bold">AKTİF</span>}
+                                   {u.isBanned ? (
+                                       <div className="text-right">
+                                           <span className="text-red-500 text-xs font-bold block">BANLI</span>
+                                           <span className="text-[10px] text-red-400/70">{u.banExpiresAt ? `${new Date(u.banExpiresAt).toLocaleDateString('tr-TR')}'e kadar` : 'Kalıcı'}</span>
+                                       </div>
+                                   ) : <span className="text-green-500 text-xs font-bold">AKTİF</span>}
                                </div>
                            </div>
                            {u.role !== UserRole.ADMIN && (
                                <div className="flex gap-2 flex-wrap">
-                                   <button onClick={() => handleBan(u.id)} className={`flex-1 text-xs font-bold py-2.5 rounded-lg transition-colors ${u.isBanned ? 'bg-gray-700 text-white' : 'bg-red-500/10 text-red-500 border border-red-900/30'}`}>
-                                       {u.isBanned ? 'Yasağı Kaldır' : 'Banla'}
-                                   </button>
+                                   {u.isBanned ? (
+                                       <button onClick={() => handleUnban(u.id)} className="flex-1 text-xs font-bold py-2.5 rounded-lg transition-colors bg-gray-700 text-white hover:bg-gray-600">
+                                           Yasağı Kaldır
+                                       </button>
+                                   ) : (
+                                       <button onClick={() => { setBanDuration('7'); setBanModal({ userId: u.id, username: u.username }); }} className="flex-1 text-xs font-bold py-2.5 rounded-lg transition-colors bg-red-500/10 text-red-500 border border-red-900/30 hover:bg-red-500/20">
+                                           Banla
+                                       </button>
+                                   )}
                                    <button onClick={() => handleRoleChange(u.id, u.role === UserRole.EDITOR ? UserRole.USER : UserRole.EDITOR)} className={`flex-1 text-xs font-bold py-2.5 rounded-lg transition-colors flex items-center justify-center gap-1 ${u.role === UserRole.EDITOR ? 'bg-gray-700 text-white' : 'bg-blue-500/10 text-blue-400 border border-blue-900/30'}`}>
                                        {u.role === UserRole.EDITOR ? 'Editörü Al' : 'Editör Yap'}
                                    </button>
@@ -893,13 +920,25 @@ const AdminDashboard = () => {
                                        </span>
                                    </td>
                                    <td className="p-4">
-                                       {u.isBanned ? <span className="text-red-500 text-xs font-bold">BANLI</span> : <span className="text-green-500 text-xs font-bold">AKTİF</span>}
+                                       {u.isBanned ? (
+                                           <div>
+                                               <span className="text-red-500 text-xs font-bold block">BANLI</span>
+                                               <span className="text-[10px] text-red-400/70">{u.banExpiresAt ? `${new Date(u.banExpiresAt).toLocaleDateString('tr-TR')}'e kadar` : 'Kalıcı'}</span>
+                                           </div>
+                                       ) : <span className="text-green-500 text-xs font-bold">AKTİF</span>}
                                    </td>
                                    <td className="p-4">
                                        {u.role !== UserRole.ADMIN && (
                                            <div className="flex items-center gap-2 flex-wrap">
-                                               <button onClick={() => handleBan(u.id)} className={`text-xs font-bold px-3 py-1.5 rounded transition-colors ${u.isBanned ? 'bg-gray-700 text-white hover:bg-gray-600' : 'bg-red-500/10 text-red-500 border border-red-900/30 hover:bg-red-500/20'}`}>
-                                                   {u.isBanned ? 'Yasağı Kaldır' : 'Banla'}
+                                               {u.isBanned ? (
+                                                   <button onClick={() => handleUnban(u.id)} className="text-xs font-bold px-3 py-1.5 rounded transition-colors bg-gray-700 text-white hover:bg-gray-600">
+                                                       Yasağı Kaldır
+                                                   </button>
+                                               ) : (
+                                                   <button onClick={() => { setBanDuration('7'); setBanModal({ userId: u.id, username: u.username }); }} className="text-xs font-bold px-3 py-1.5 rounded transition-colors bg-red-500/10 text-red-500 border border-red-900/30 hover:bg-red-500/20">
+                                                       Banla
+                                                   </button>
+                                               )}
                                                </button>
                                                <button onClick={() => handleRoleChange(u.id, u.role === UserRole.EDITOR ? UserRole.USER : UserRole.EDITOR)} className={`text-xs font-bold px-3 py-1.5 rounded transition-colors flex items-center gap-1 ${u.role === UserRole.EDITOR ? 'bg-gray-700 text-white hover:bg-gray-600' : 'bg-blue-500/10 text-blue-400 border border-blue-900/30 hover:bg-blue-500/20'}`}>
                                                    {u.role === UserRole.EDITOR ? 'Editörü Al' : 'Editör Yap'}
@@ -1269,6 +1308,54 @@ const AdminDashboard = () => {
               <button onClick={() => setEditingEp(null)} className="flex-1 py-2.5 rounded-xl border border-gray-700 text-gray-300 text-sm hover:bg-gray-800 transition-colors">İptal</button>
               <button onClick={handleSaveEdit} disabled={editSaving} className="flex-1 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-black font-bold text-sm transition-colors flex items-center justify-center gap-2 disabled:opacity-60">
                 {editSaving ? 'Kaydediliyor...' : <><Save size={14}/> Kaydet</>}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Ban Duration Modal */}
+      {banModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
+          <div className="bg-[#18181b] border border-gray-800 rounded-2xl shadow-2xl w-full max-w-sm p-6">
+            <h3 className="text-white font-black text-lg mb-1">Kullanıcıyı Banla</h3>
+            <p className="text-gray-400 text-sm mb-5">
+              <span className="text-amber-400 font-bold">@{banModal.username}</span> için ban süresi seçin.
+            </p>
+            <div className="grid grid-cols-2 gap-2 mb-4">
+              {[
+                { label: '1 Gün', value: '1' },
+                { label: '3 Gün', value: '3' },
+                { label: '7 Gün', value: '7' },
+                { label: '30 Gün', value: '30' },
+                { label: '90 Gün', value: '90' },
+                { label: '180 Gün', value: '180' },
+                { label: '1 Yıl', value: '365' },
+                { label: 'Kalıcı', value: 'permanent' },
+              ].map(opt => (
+                <button
+                  key={opt.value}
+                  onClick={() => setBanDuration(opt.value)}
+                  className={`py-2.5 rounded-xl text-sm font-bold transition-colors border ${banDuration === opt.value ? 'bg-red-500 text-white border-red-500' : 'bg-gray-800 text-gray-300 border-gray-700 hover:border-red-500/50'}`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+            {banDuration !== 'permanent' && (
+              <p className="text-xs text-gray-500 mb-4 text-center">
+                Ban bitiş: <span className="text-amber-400">{new Date(Date.now() + parseInt(banDuration) * 86400000).toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' })}</span>
+              </p>
+            )}
+            {banDuration === 'permanent' && (
+              <p className="text-xs text-red-400 mb-4 text-center font-bold">Kalıcı ban — süresiz yasaklama</p>
+            )}
+            <div className="flex gap-3">
+              <button onClick={() => setBanModal(null)} className="flex-1 py-2.5 rounded-xl text-sm font-bold bg-gray-800 text-gray-300 hover:bg-gray-700 transition-colors">
+                İptal
+              </button>
+              <button onClick={handleBanConfirm} className="flex-1 py-2.5 rounded-xl text-sm font-bold bg-red-500 text-white hover:bg-red-600 transition-colors">
+                Banla
               </button>
             </div>
           </div>

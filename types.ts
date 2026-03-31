@@ -61,6 +61,7 @@ export interface User {
   showAnimeList?: boolean;
   customLists?: UserList[];
   isBanned?: boolean;
+  banExpiresAt?: string | null; // null = kalıcı ban
   createdAt?: string;
   // XP & Level System
   xp: number;
