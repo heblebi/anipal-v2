@@ -107,8 +107,8 @@ const FriendsPage = () => {
   // ── Active Chat View ──────────────────────────────────────────────────────
   if (activeConv) {
     return (
-      <div className="max-w-2xl mx-auto px-4 pt-24 pb-6 h-screen flex flex-col">
-        <div className="flex items-center gap-3 mb-4 flex-shrink-0">
+      <div className="max-w-2xl mx-auto px-4 pt-20 flex flex-col" style={{ height: '100dvh' }}>
+        <div className="flex items-center gap-3 mb-3 flex-shrink-0 pt-2">
           <button onClick={() => setActiveConv(null)} className="text-gray-400 hover:text-white p-2 -ml-2">
             <ArrowLeft size={20} />
           </button>
@@ -121,7 +121,7 @@ const FriendsPage = () => {
           </Link>
         </div>
 
-        <div className="flex-1 overflow-y-auto bg-[#18181b] border border-gray-800 rounded-2xl p-4 space-y-3 mb-3">
+        <div className="flex-1 min-h-0 overflow-y-auto bg-[#18181b] border border-gray-800 rounded-2xl p-4 space-y-3 mb-3">
           {messages.length === 0 && (
             <div className="text-center text-gray-600 text-sm pt-8">Henüz mesaj yok. İlk mesajı gönder!</div>
           )}
@@ -141,7 +141,7 @@ const FriendsPage = () => {
           <div ref={messagesEndRef} />
         </div>
 
-        <div className="flex gap-2 flex-shrink-0">
+        <div className="flex gap-2 flex-shrink-0 pb-4">
           <input
             className="flex-1 bg-[#18181b] border border-gray-700 rounded-xl px-4 py-3 text-sm text-white placeholder-gray-500 focus:border-amber-500 focus:outline-none"
             placeholder="Mesaj yaz..."
@@ -181,9 +181,10 @@ const FriendsPage = () => {
           <button
             key={t.key}
             onClick={() => setTab(t.key)}
-            className={`flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-lg text-sm font-bold transition-colors relative ${tab === t.key ? 'bg-[#18181b] text-white' : 'text-gray-500 hover:text-gray-300'}`}
+            className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 px-1 rounded-lg font-bold transition-colors relative ${tab === t.key ? 'bg-[#18181b] text-white' : 'text-gray-500 hover:text-gray-300'}`}
           >
-            {t.icon} {t.label}
+            {t.icon}
+            <span className="text-xs sm:text-sm truncate">{t.label}</span>
             {t.badge ? (
               <span className="absolute top-1 right-1 bg-amber-500 text-black text-[10px] font-black w-4 h-4 rounded-full flex items-center justify-center">{t.badge}</span>
             ) : null}

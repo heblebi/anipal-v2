@@ -337,38 +337,35 @@ const AnimeDetail = () => {
                 };
                 return (
                 <div className="bg-[#18181b] p-3 sm:p-4 rounded-xl border border-gray-800 space-y-3">
-                    <div className="flex flex-wrap justify-between items-start gap-3">
+                    <div className="space-y-2">
                         <div className="min-w-0">
                             <h2 className="text-base sm:text-xl font-bold text-white leading-tight">{selectedEpisode.number}. Bölüm: {selectedEpisode.title}</h2>
                             {selectedFansubName && selectedFansubName !== 'Varsayılan' && (
                               <span className="text-xs text-amber-500 font-medium">Fansub: {selectedFansubName}</span>
                             )}
                         </div>
-
-                        <div className="flex gap-2 flex-shrink-0">
+                        <div className="flex gap-2">
                             <Button
                                  onClick={handleToggleWatched}
                                  variant="secondary"
-                                 className={`flex items-center gap-1.5 text-sm px-3 py-2 h-auto ${isWatched ? 'text-green-500 border-green-900 bg-green-900/10 hover:text-red-400 hover:border-red-900 hover:bg-red-900/10' : ''}`}
+                                 className={`flex items-center gap-1.5 text-xs sm:text-sm px-2.5 sm:px-3 py-2 h-auto flex-1 sm:flex-none justify-center ${isWatched ? 'text-green-500 border-green-900 bg-green-900/10 hover:text-red-400 hover:border-red-900 hover:bg-red-900/10' : ''}`}
                             >
-                                <CheckCircle2 size={16} />
-                                <span className="hidden sm:inline">{isWatched ? 'İzlendi' : 'İzlendi İşaretle'}</span>
-                                <span className="sm:hidden">{isWatched ? '✓' : 'İzlendi'}</span>
+                                <CheckCircle2 size={15} />
+                                <span>{isWatched ? 'İzlendi' : 'İzlendi İşaretle'}</span>
                             </Button>
 
                             <Button
                                 variant="secondary"
                                 onClick={() => isAuthenticated ? setShowListModal(true) : navigate('/login')}
-                                className={`flex items-center gap-1.5 text-sm px-3 py-2 h-auto ${isInAnyList ? 'text-amber-400 border-amber-900 bg-amber-900/10' : ''}`}
+                                className={`flex items-center gap-1.5 text-xs sm:text-sm px-2.5 sm:px-3 py-2 h-auto flex-1 sm:flex-none justify-center ${isInAnyList ? 'text-amber-400 border-amber-900 bg-amber-900/10' : ''}`}
                             >
-                                <List size={16} />
-                                <span className="hidden sm:inline">Listeye Ekle</span>
-                                <span className="sm:hidden"><Plus size={14}/></span>
+                                <List size={15} />
+                                <span>Listeye Ekle</span>
                             </Button>
 
-                            <Button variant="ghost" onClick={() => commentsRef.current?.scrollIntoView({behavior:'smooth'})} className="gap-1.5 text-sm px-3 py-2 h-auto">
-                                <MessageSquare size={16} />
-                                <span className="hidden sm:inline">Yorumlar</span>
+                            <Button variant="ghost" onClick={() => commentsRef.current?.scrollIntoView({behavior:'smooth'})} className="flex items-center gap-1.5 text-xs sm:text-sm px-2.5 sm:px-3 py-2 h-auto flex-1 sm:flex-none justify-center">
+                                <MessageSquare size={15} />
+                                <span>Yorumlar</span>
                             </Button>
                         </div>
                     </div>
@@ -450,8 +447,8 @@ const AnimeDetail = () => {
 
       {/* List Modal */}
       {showListModal && anime && (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4" onClick={e => e.target === e.currentTarget && setShowListModal(false)}>
-          <div className="bg-[#18181b] border border-gray-800 rounded-2xl w-full max-w-sm shadow-2xl overflow-hidden">
+        <div className="fixed inset-0 bg-black/80 flex items-end sm:items-center justify-center z-50 p-0 sm:p-4" onClick={e => e.target === e.currentTarget && setShowListModal(false)}>
+          <div className="bg-[#18181b] border border-gray-800 rounded-t-2xl sm:rounded-2xl w-full sm:max-w-sm shadow-2xl overflow-hidden">
             <div className="flex items-center justify-between px-5 py-4 border-b border-gray-800">
               <h3 className="font-bold text-white">Listelerim</h3>
               <button onClick={() => setShowListModal(false)} className="text-gray-500 hover:text-white"><X size={20} /></button>

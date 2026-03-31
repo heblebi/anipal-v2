@@ -313,10 +313,10 @@ const handleSaveEntry = async () => {
       {/* List Modal */}
       {showListModal && (
         <div
-          className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4"
+          className="fixed inset-0 bg-black/80 flex items-end sm:items-center justify-center z-50 p-0 sm:p-4"
           onClick={e => e.target === e.currentTarget && setShowListModal(false)}
         >
-          <div className="bg-[#18181b] border border-gray-800 rounded-2xl w-full max-w-sm shadow-2xl overflow-hidden">
+          <div className="bg-[#18181b] border border-gray-800 rounded-t-2xl sm:rounded-2xl w-full sm:max-w-sm shadow-2xl overflow-hidden">
             <div className="flex items-center justify-between px-5 py-4 border-b border-gray-800">
               <h3 className="font-bold text-white">Listelerim</h3>
               <button onClick={() => setShowListModal(false)} className="text-gray-500 hover:text-white">
