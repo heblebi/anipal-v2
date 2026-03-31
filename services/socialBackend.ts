@@ -78,24 +78,41 @@ export const getFriendshipStatus = async (targetId: string): Promise<Friendship 
 
 export const getFriends = async (userId: string): Promise<Friendship[]> => {
     const { data } = await supabase.from('friendships')
-        .select('*, requester:profiles!friendships_requester_id_fkey(id,username,display_name,avatar), addressee:profiles!friendships_addressee_id_fkey(id,username,display_name,avatar)')
+        .select('id, requester_id, addressee_id, status, created_at')
         .or(`requester_id.eq.${userId},addressee_id.eq.${userId}`)
         .eq('status', 'accepted');
-    return (data || []).map((f: any) => ({
+    if (!data || data.length === 0) return [];
+    const allIds = [...new Set(data.flatMap((f: any) => [f.requester_id, f.addressee_id]))];
+    const { data: profiles } = await supabase.from('profiles')
+        .select('id, username, display_name, avatar').in('id', allIds);
+    const pm = new Map((profiles || []).map((p: any) => [p.id, p]));
+    const mapP = (id: string) => {
+        const p = pm.get(id);
+        return p ? { id: p.id, username: p.username, displayName: p.display_name || p.username, avatar: p.avatar } : { id, username: 'Kullanıcı', displayName: 'Kullanıcı', avatar: '' };
+    };
+    return data.map((f: any) => ({
         id: f.id, requesterId: f.requester_id, addresseeId: f.addressee_id, status: f.status, createdAt: f.created_at,
-        requester: f.requester ? { id: f.requester.id, username: f.requester.username, displayName: f.requester.display_name, avatar: f.requester.avatar } : undefined,
-        addressee: f.addressee ? { id: f.addressee.id, username: f.addressee.username, displayName: f.addressee.display_name, avatar: f.addressee.avatar } : undefined,
+        requester: mapP(f.requester_id), addressee: mapP(f.addressee_id),
     }));
 };
 
 export const getPendingRequests = async (userId: string): Promise<Friendship[]> => {
     const { data } = await supabase.from('friendships')
-        .select('*, requester:profiles!friendships_requester_id_fkey(id,username,display_name,avatar)')
+        .select('id, requester_id, addressee_id, status, created_at')
         .eq('addressee_id', userId).eq('status', 'pending');
-    return (data || []).map((f: any) => ({
-        id: f.id, requesterId: f.requester_id, addresseeId: f.addressee_id, status: f.status, createdAt: f.created_at,
-        requester: f.requester ? { id: f.requester.id, username: f.requester.username, displayName: f.requester.display_name, avatar: f.requester.avatar } : undefined,
-    }));
+    if (!data || data.length === 0) return [];
+    // Fetch requester profiles separately to avoid FK join issues
+    const requesterIds = data.map((f: any) => f.requester_id);
+    const { data: profiles } = await supabase.from('profiles')
+        .select('id, username, display_name, avatar').in('id', requesterIds);
+    const profileMap = new Map((profiles || []).map((p: any) => [p.id, p]));
+    return data.map((f: any) => {
+        const p = profileMap.get(f.requester_id);
+        return {
+            id: f.id, requesterId: f.requester_id, addresseeId: f.addressee_id, status: f.status, createdAt: f.created_at,
+            requester: p ? { id: p.id, username: p.username, displayName: p.display_name || p.username, avatar: p.avatar } : { id: f.requester_id, username: 'Kullanıcı', displayName: 'Kullanıcı', avatar: '' },
+        };
+    });
 };
 
 export const searchUsers = async (query: string): Promise<User[]> => {
