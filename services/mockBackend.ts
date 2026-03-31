@@ -300,14 +300,36 @@ export const getCurrentUser = async (): Promise<User | null> => {
 // ─── Notifications ────────────────────────────────────────────────────────────
 
 export const getNotifications = async (userId: string): Promise<Notification[]> => {
-    const profile = await fetchProfile(userId);
-    return profile.notifications || [];
+    // Read from user_notifications table (supports cross-user notifications like friend requests)
+    const { data: rows } = await supabase.from('user_notifications')
+        .select('*').eq('user_id', userId).order('created_at', { ascending: false }).limit(30);
+    const tableNotifs: Notification[] = (rows || []).map((r: any) => ({
+        id: r.id, userId: r.user_id, type: r.type as Notification['type'],
+        title: r.title, message: r.message, isRead: r.is_read, createdAt: r.created_at,
+    }));
+    // Also read from profiles.notifications (legacy: level up, badge, anime request etc.)
+    try {
+        const profile = await fetchProfile(userId);
+        const legacyNotifs: Notification[] = (profile.notifications || []);
+        // Merge and deduplicate by id, sort by date
+        const all = [...tableNotifs, ...legacyNotifs];
+        const seen = new Set<string>();
+        return all.filter(n => { if (seen.has(n.id)) return false; seen.add(n.id); return true; })
+            .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    } catch {
+        return tableNotifs;
+    }
 };
 
 export const markNotificationsAsRead = async (userId: string) => {
-    const profile = await fetchProfile(userId);
-    profile.notifications = (profile.notifications || []).map((n: Notification) => ({ ...n, isRead: true }));
-    await saveProfile(profile);
+    // Mark user_notifications table rows as read
+    await supabase.from('user_notifications').update({ is_read: true }).eq('user_id', userId).eq('is_read', false);
+    // Also mark legacy profile notifications
+    try {
+        const profile = await fetchProfile(userId);
+        profile.notifications = (profile.notifications || []).map((n: Notification) => ({ ...n, isRead: true }));
+        await saveProfile(profile);
+    } catch { /* ignore */ }
 };
 
 // ─── Leaderboard ──────────────────────────────────────────────────────────────

@@ -24,16 +24,15 @@ export const sendFriendRequest = async (addresseeId: string): Promise<void> => {
     if (blocked) throw new Error('Bu kullanıcıyla bağlantı kurulamaz');
     const { error } = await supabase.from('friendships').insert({ requester_id: uid, addressee_id: addresseeId });
     if (error) throw new Error(error.message);
-    // Notify addressee
-    const [{ data: addrProf }, { data: me }] = await Promise.all([
-        supabase.from('profiles').select('notifications').eq('id', addresseeId).single(),
-        supabase.from('profiles').select('username,display_name').eq('id', uid).single(),
-    ]);
-    if (addrProf && me) {
-        const notifs = addrProf.notifications || [];
-        await supabase.from('profiles').update({
-            notifications: [{ id: `notif-${Date.now()}`, userId: addresseeId, type: 'FOLLOW', title: 'Arkadaşlık İsteği', message: `${me.display_name || me.username} sana arkadaşlık isteği gönderdi.`, isRead: false, createdAt: new Date().toISOString() }, ...notifs]
-        }).eq('id', addresseeId);
+    // Notify addressee via user_notifications table (bypasses profile update RLS)
+    const { data: me } = await supabase.from('profiles').select('username,display_name').eq('id', uid).single();
+    if (me) {
+        await supabase.from('user_notifications').insert({
+            user_id: addresseeId,
+            type: 'FOLLOW',
+            title: 'Arkadaşlık İsteği',
+            message: `${me.display_name || me.username} sana arkadaşlık isteği gönderdi.`,
+        });
     }
 };
 
