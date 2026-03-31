@@ -845,10 +845,10 @@ export const updateAnimeRequestStatus = async (id: string, status: 'approved' | 
         id: `notif-${Date.now()}`,
         userId: req.user_id,
         type: 'ANIME_REQUEST',
-        title: status === 'approved' ? 'Anime İsteğin Onaylandı!' : 'Anime İsteğin Reddedildi',
+        title: status === 'approved' ? 'İsteğin Onaylandı!' : 'İsteğin Reddedildi',
         message: status === 'approved'
-            ? `"${req.anime_name}" adlı anime isteğin onaylandı.`
-            : `"${req.anime_name}" adlı anime isteğin reddedildi.`,
+            ? `"${req.anime_name}" isteğin onaylandı.`
+            : `"${req.anime_name}" isteğin reddedildi.`,
         isRead: false,
         createdAt: new Date().toISOString(),
     };
