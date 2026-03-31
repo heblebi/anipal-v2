@@ -302,7 +302,8 @@ const Layout = ({ children }: { children?: React.ReactNode }) => {
                               {/* Friends Tab */}
                               <div className="flex items-center gap-2 px-4 py-3 border-b border-gray-800">
                                 <button onClick={() => setProfileTab('menu')} className="text-gray-500 hover:text-white text-xs flex-shrink-0">← Geri</button>
-                                <span className="font-bold text-sm text-white">Arkadaşlar</span>
+                                <span className="font-bold text-sm text-white flex-1">Arkadaşlar</span>
+                                <Link to="/social" onClick={() => setShowProfileMenu(false)} className="text-xs text-amber-400 hover:text-amber-300 font-semibold flex-shrink-0">Sayfaya Git →</Link>
                               </div>
                               {/* Search */}
                               <div className="px-3 py-2 border-b border-gray-800">
