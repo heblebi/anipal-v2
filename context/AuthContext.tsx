@@ -66,7 +66,11 @@ export const AuthProvider = ({ children }: { children?: ReactNode }) => {
         const u = await getUserFromSession(session).catch(() => null);
         if (!cancelled) {
           if (u) { saveCache(u); setUser(u); }
-          else if (cached) setUser(cached); // profil gelmedi ama cache var, koru
+          else {
+            // null dönüşü: ban veya profil hatası — her iki durumda da çıkış
+            clearCache();
+            setUser(null);
+          }
           setIsLoading(false);
         }
       } catch {
@@ -96,6 +100,25 @@ export const AuthProvider = ({ children }: { children?: ReactNode }) => {
       subscription.unsubscribe();
     };
   }, []);
+
+  // Periyodik ban kontrolü — her 2 dakikada bir ban durumunu Supabase'den kontrol et
+  useEffect(() => {
+    if (!user) return;
+    const check = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) return;
+        const u = await getUserFromSession(session);
+        if (!u) {
+          // Ban yenilendi veya oturum geçersiz
+          clearCache();
+          setUser(null);
+        }
+      } catch { /* ignore */ }
+    };
+    const interval = setInterval(check, 120000); // 2 dakika
+    return () => clearInterval(interval);
+  }, [user?.id]);
 
   const loginUser = (u: User) => { saveCache(u); setUser(u); setIsLoading(false); };
 

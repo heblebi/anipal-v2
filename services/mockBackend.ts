@@ -349,6 +349,10 @@ export const getUserFromSession = async (session: { user: { id: string; email?: 
     for (let attempt = 0; attempt < 3; attempt++) {
         try {
             const profile = await fetchProfile(session.user.id);
+            if (profile.is_banned) {
+                await supabase.auth.signOut();
+                return null;
+            }
             return mapProfile(profile, session.user.email);
         } catch {
             if (attempt < 2) await new Promise(r => setTimeout(r, 800));
