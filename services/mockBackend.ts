@@ -629,7 +629,11 @@ export const addComment = async (data: any) => {
 export const getCommentsByEpisodeId = async (episodeId: string): Promise<Comment[]> => {
     const { data, error } = await supabase.from('comments').select('*').eq('episode_id', episodeId).order('created_at', { ascending: true });
     if (error) return [];
-    return (data || []).map(c => ({ id: c.id, episodeId: c.episode_id, userId: c.user_id, username: c.username, content: c.content, isSpoiler: c.is_spoiler, createdAt: c.created_at }));
+    if (!data || data.length === 0) return [];
+    const userIds = [...new Set(data.map((c: any) => c.user_id))];
+    const { data: profiles } = await supabase.from('profiles').select('id,avatar').in('id', userIds);
+    const avatarMap = new Map((profiles || []).map((p: any) => [p.id, p.avatar || '']));
+    return data.map(c => ({ id: c.id, episodeId: c.episode_id, userId: c.user_id, username: c.username, avatar: avatarMap.get(c.user_id) || '', content: c.content, isSpoiler: c.is_spoiler, createdAt: c.created_at }));
 };
 
 export const deleteComment = async (commentId: string, requestingUserId: string) => {

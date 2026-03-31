@@ -122,6 +122,7 @@ export interface Comment {
   episodeId: string;
   userId: string;
   username: string;
+  avatar?: string;
   content: string;
   isSpoiler: boolean;
   createdAt: string;

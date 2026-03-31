@@ -38,7 +38,7 @@ const SingleComment: React.FC<{ comment: Comment; currentUserId?: string; curren
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-2">
           <Link to={`/profile/${comment.userId}`} className="w-8 h-8 rounded-full bg-gray-700 flex items-center justify-center hover:ring-2 hover:ring-amber-500 transition-all overflow-hidden flex-shrink-0">
-            <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${comment.username}`} alt="" className="w-full h-full object-cover" />
+            <img src={comment.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${comment.username}`} alt="" className="w-full h-full object-cover" />
           </Link>
           <Link to={`/profile/${comment.userId}`} className="font-bold text-gray-200 text-sm hover:text-amber-400 transition-colors">
             {comment.username}
