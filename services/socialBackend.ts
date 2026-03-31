@@ -128,6 +128,11 @@ export const searchUsers = async (query: string): Promise<User[]> => {
 export const sendMessage = async (receiverId: string, content: string): Promise<Message> => {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) throw new Error('Giriş yapmalısın');
+    const uid = session.user.id;
+    // Check if receiver blocked sender
+    const { data: blocked } = await supabase.from('friendships')
+        .select('id').eq('requester_id', receiverId).eq('addressee_id', uid).eq('status', 'blocked').maybeSingle();
+    if (blocked) throw new Error('Bu kullanıcıya mesaj gönderemezsiniz.');
     const { data: rec } = await supabase.from('profiles').select('allow_messages').eq('id', receiverId).single();
     if (rec && rec.allow_messages === false) throw new Error('Bu kullanıcı mesaj almıyor.');
     const { data, error } = await supabase.from('messages')

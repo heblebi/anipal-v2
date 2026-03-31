@@ -192,6 +192,24 @@ const Profile = () => {
   if (loading) return <div className="text-center p-10">Yükleniyor...</div>;
   if (!profileUser) return <div className="text-center p-10 text-red-500">Kullanıcı bulunamadı</div>;
 
+  // If profile owner has blocked the current user, show blocked screen
+  const isBlockedByOwner = !!(
+    currentUser &&
+    currentUser.id !== profileUser.id &&
+    friendship?.status === 'blocked' &&
+    friendship?.requesterId === profileUser.id
+  );
+  if (isBlockedByOwner) return (
+    <div className="min-h-screen bg-[#0f0f10] flex items-center justify-center p-6">
+      <div className="text-center space-y-3">
+        <div className="text-5xl">🚫</div>
+        <p className="text-white font-bold text-lg">Bu profili görüntüleyemezsiniz</p>
+        <p className="text-gray-500 text-sm">Bu kullanıcı sizi engellemiştir.</p>
+        <button onClick={() => navigate(-1)} className="mt-4 px-5 py-2 bg-gray-800 text-gray-300 rounded-xl text-sm hover:bg-gray-700 transition-colors">Geri Dön</button>
+      </div>
+    </div>
+  );
+
   const isOwnProfile = currentUser?.id === profileUser.id;
   const currentXP = profileUser.xp || 0;
   const currentLevel = profileUser.level || 1;
