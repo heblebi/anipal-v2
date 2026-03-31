@@ -939,7 +939,6 @@ const AdminDashboard = () => {
                                                        Banla
                                                    </button>
                                                )}
-                                               </button>
                                                <button onClick={() => handleRoleChange(u.id, u.role === UserRole.EDITOR ? UserRole.USER : UserRole.EDITOR)} className={`text-xs font-bold px-3 py-1.5 rounded transition-colors flex items-center gap-1 ${u.role === UserRole.EDITOR ? 'bg-gray-700 text-white hover:bg-gray-600' : 'bg-blue-500/10 text-blue-400 border border-blue-900/30 hover:bg-blue-500/20'}`}>
                                                    {u.role === UserRole.EDITOR ? 'Editörü Al' : 'Editör Yap'}
                                                </button>
