@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { Users, MessageCircle, UserPlus, Check, X, Send, ArrowLeft, Search, UserCheck } from 'lucide-react';
 import {
   getFriends, getPendingRequests, acceptFriendRequest, rejectFriendRequest,
@@ -14,7 +14,8 @@ type Tab = 'friends' | 'messages' | 'requests';
 const FriendsPage = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const [tab, setTab] = useState<Tab>('friends');
+  const [searchParams] = useSearchParams();
+  const [tab, setTab] = useState<Tab>((searchParams.get('tab') as Tab) || 'friends');
 
   const [friends, setFriends] = useState<Friendship[]>([]);
   const [pending, setPending] = useState<Friendship[]>([]);

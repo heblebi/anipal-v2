@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import Button from './Button';
 import { UserRole, Notification } from '../types';
 import { LogOut, Menu, X, Settings, User as UserIcon, Search, Bell, ChevronDown, Send, MessageCircle, Users, UserCheck, UserPlus, Check } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { useSiteSettings } from '../context/SiteSettingsContext';
 import { getNotifications, markNotificationsAsRead } from '../services/mockBackend';
 import { getConversations, getTotalUnreadMessages, getFriends, getPendingRequests, acceptFriendRequest, rejectFriendRequest, searchUsers, sendFriendRequest } from '../services/socialBackend';
@@ -13,6 +14,7 @@ import type { Conversation, Friendship } from '../types';
 const Layout = ({ children }: { children?: React.ReactNode }) => {
   const { user, isAuthenticated, logoutUser } = useAuth();
   const { settings: siteSettings } = useSiteSettings();
+  const navigate = useNavigate();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false);
   const [scrolled, setScrolled] = useState(false);
 
@@ -216,8 +218,9 @@ const Layout = ({ children }: { children?: React.ReactNode }) => {
                                <div className="p-3 border-b border-gray-800 font-bold text-sm text-gray-300">Bildirimler</div>
                                <div className="max-h-72 overflow-y-auto custom-scrollbar">
                                    {notifications.length > 0 ? (
-                                       notifications.map(notif => (
-                                           <div key={notif.id} className={`p-3 border-b border-gray-800/50 hover:bg-gray-800 transition-colors ${!notif.isRead ? 'bg-amber-500/5' : ''}`}>
+                                       notifications.map(notif => {
+                                           const notifLink = notif.type === 'FOLLOW' ? '/social?tab=requests' : notif.type === 'ANIME_REQUEST' ? '/request' : null;
+                                           const inner = (
                                                <div className="flex items-start gap-3">
                                                    <div className="text-xl">
                                                        {notif.type === 'LEVEL_UP' && '🆙'}
@@ -232,8 +235,13 @@ const Layout = ({ children }: { children?: React.ReactNode }) => {
                                                        <p className="text-[10px] text-gray-600 mt-1">{new Date(notif.createdAt).toLocaleTimeString()}</p>
                                                    </div>
                                                </div>
-                                           </div>
-                                       ))
+                                           );
+                                           return notifLink ? (
+                                               <Link key={notif.id} to={notifLink} onClick={() => setShowNotifs(false)} className={`block p-3 border-b border-gray-800/50 hover:bg-gray-800 transition-colors cursor-pointer ${!notif.isRead ? 'bg-amber-500/5' : ''}`}>{inner}</Link>
+                                           ) : (
+                                               <div key={notif.id} className={`p-3 border-b border-gray-800/50 hover:bg-gray-800 transition-colors ${!notif.isRead ? 'bg-amber-500/5' : ''}`}>{inner}</div>
+                                           );
+                                       })
                                    ) : (
                                        <div className="p-4 text-center text-xs text-gray-500">Bildirim yok.</div>
                                    )}
