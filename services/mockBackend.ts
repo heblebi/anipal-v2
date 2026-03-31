@@ -780,7 +780,7 @@ export const getSiteStats = async (): Promise<SiteStats> => {
 
 export const getUsers = async (): Promise<User[]> => {
     const { data } = await supabase.from('profiles')
-        .select('id,username,display_name,email,role,xp,level,is_banned,ban_expires_at,created_at,bio,cover_image,watchlist,watched_episodes,liked_episodes,anime_list,custom_lists,earned_achievements,displayed_badges,notifications,show_anime_list')
+        .select('id,username,display_name,email,role,xp,level,is_banned,created_at,bio,cover_image,watchlist,watched_episodes,liked_episodes,anime_list,custom_lists,earned_achievements,displayed_badges,notifications,show_anime_list')
         .order('created_at', { ascending: false });
     return (data || []).map(p => mapProfile(p));
 };
@@ -792,11 +792,18 @@ export const getUserById = async (id: string): Promise<User | null> => {
 // durationDays: gün sayısı (1,3,7,30,365...) veya null = kalıcı
 export const banUser = async (id: string, durationDays: number | null) => {
     const expiresAt = durationDays ? new Date(Date.now() + durationDays * 86400000).toISOString() : null;
-    await supabase.from('profiles').update({ is_banned: true, ban_expires_at: expiresAt }).eq('id', id);
+    // Try with ban_expires_at first; if column doesn't exist yet, fall back to just is_banned
+    const { error } = await supabase.from('profiles').update({ is_banned: true, ban_expires_at: expiresAt }).eq('id', id);
+    if (error) {
+        await supabase.from('profiles').update({ is_banned: true }).eq('id', id);
+    }
 };
 
 export const unbanUser = async (id: string) => {
-    await supabase.from('profiles').update({ is_banned: false, ban_expires_at: null }).eq('id', id);
+    const { error } = await supabase.from('profiles').update({ is_banned: false, ban_expires_at: null }).eq('id', id);
+    if (error) {
+        await supabase.from('profiles').update({ is_banned: false }).eq('id', id);
+    }
 };
 
 /** @deprecated use banUser/unbanUser */
