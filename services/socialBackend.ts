@@ -1,6 +1,7 @@
 import { supabase } from './supabase';
 import type { User, Friendship, Message, Conversation, Report } from '../types';
 import { UserRole } from '../types';
+import { grantFriendXP, grantMessageXP } from './mockBackend';
 
 const mapProfile = (p: any): User => ({
     id: p.id, username: p.username, displayName: p.display_name || p.username,
@@ -37,8 +38,13 @@ export const sendFriendRequest = async (addresseeId: string): Promise<void> => {
 };
 
 export const acceptFriendRequest = async (friendshipId: string): Promise<void> => {
-    const { error } = await supabase.from('friendships').update({ status: 'accepted' }).eq('id', friendshipId);
+    const { data: fs, error } = await supabase.from('friendships').update({ status: 'accepted' }).eq('id', friendshipId).select().single();
     if (error) throw new Error(error.message);
+    // Grant XP to both users (once per friendship pair)
+    if (fs) {
+        grantFriendXP(fs.requester_id, fs.addressee_id).catch(() => {});
+        grantFriendXP(fs.addressee_id, fs.requester_id).catch(() => {});
+    }
 };
 
 export const rejectFriendRequest = async (friendshipId: string): Promise<void> => {
@@ -139,6 +145,8 @@ export const sendMessage = async (receiverId: string, content: string): Promise<
         .insert({ sender_id: session.user.id, receiver_id: receiverId, content })
         .select().single();
     if (error) throw new Error(error.message);
+    // Grant small XP for messaging (daily capped)
+    grantMessageXP(uid).catch(() => {});
     return { id: data.id, senderId: data.sender_id, receiverId: data.receiver_id, content: data.content, isRead: data.is_read, createdAt: data.created_at };
 };
 

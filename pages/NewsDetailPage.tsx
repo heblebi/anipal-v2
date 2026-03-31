@@ -1,12 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { getNewsById } from '../services/mockBackend';
+import { getNewsById, grantNewsReadXP } from '../services/mockBackend';
+import { useAuth } from '../context/AuthContext';
 import { NewsItem } from '../types';
 import { Calendar, ChevronLeft, ExternalLink } from 'lucide-react';
 import CommentSection from '../components/CommentSection';
 
 const NewsDetailPage = () => {
   const { id } = useParams<{ id: string }>();
+  const { user } = useAuth();
   const [item, setItem] = useState<NewsItem | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -17,6 +19,15 @@ const NewsDetailPage = () => {
       setLoading(false);
     });
   }, [id]);
+
+  // Grant XP after 15 seconds of reading
+  useEffect(() => {
+    if (!id || !user) return;
+    const timer = setTimeout(() => {
+      grantNewsReadXP(user.id, id).catch(() => {});
+    }, 15000);
+    return () => clearTimeout(timer);
+  }, [id, user]);
 
   if (loading) return <div className="text-center pt-32 text-amber-500">Yükleniyor...</div>;
   if (!item) return (

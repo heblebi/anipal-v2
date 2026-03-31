@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Send, CheckCircle, Clock, Lightbulb } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import { submitAnimeRequest } from '../services/mockBackend';
+import { submitAnimeRequest, grantRequestXP } from '../services/mockBackend';
 import { useNavigate } from 'react-router-dom';
 
 const RATE_KEY = 'anipal_last_request';
@@ -27,13 +27,14 @@ const AnimeRequestPage = () => {
     setError('');
     setLoading(true);
     try {
-      await submitAnimeRequest(
+      const req = await submitAnimeRequest(
         user.id,
         user.username,
         user.displayName || user.username,
         title.trim(),
         note.trim()
       );
+      if (req?.id) grantRequestXP(user.id, req.id).catch(() => {});
       setSuccess(true);
     } catch (err: any) {
       setError(err.message || 'Bir hata oluştu.');

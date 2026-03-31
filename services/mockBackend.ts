@@ -92,6 +92,44 @@ const generateAchievements = (): Achievement[] => {
     ] as any[];
     listDefs.forEach(({ cnt, title, icon, rarity }) =>
         list.push({ id: `list-${cnt}`, title, description: `Listene ${cnt} anime ekledin.`, xpReward: cnt * 20, icon, conditionType: 'LIST_COUNT', conditionValue: cnt, rarity }));
+    // ── Arkadaşlık başarımları
+    const friendDefs = [
+        { cnt: 1, title: 'İlk Nakama', icon: '🤝', rarity: 'common' },
+        { cnt: 5, title: 'Sosyal Kelebek', icon: '🦋', rarity: 'common' },
+        { cnt: 10, title: 'Nakama', icon: '⚡', rarity: 'rare' },
+        { cnt: 25, title: 'Guild Master', icon: '👑', rarity: 'epic' },
+        { cnt: 50, title: 'Konoha Efsanesi', icon: '🍃', rarity: 'legendary' },
+    ] as any[];
+    friendDefs.forEach(({ cnt, title, icon, rarity }) =>
+        list.push({ id: `friend-${cnt}`, title, description: `${cnt} arkadaş edindi.`, xpReward: cnt * 15, icon, conditionType: 'FRIEND_COUNT', conditionValue: cnt, rarity }));
+    // ── Mesajlaşma başarımları
+    const msgDefs = [
+        { cnt: 10, title: 'Dedikodunun Ruhu', icon: '💬', rarity: 'common' },
+        { cnt: 50, title: 'Sohbet Ustası', icon: '🗨️', rarity: 'rare' },
+        { cnt: 100, title: 'Nakama\'nın Sesi', icon: '📡', rarity: 'epic' },
+        { cnt: 500, title: 'Transponder Snail', icon: '🐌', rarity: 'legendary' },
+    ] as any[];
+    msgDefs.forEach(({ cnt, title, icon, rarity }) =>
+        list.push({ id: `msg-${cnt}`, title, description: `${cnt} mesaj gönderdi.`, xpReward: cnt * 2, icon, conditionType: 'MESSAGE_COUNT', conditionValue: cnt, rarity }));
+    // ── Haber okuma başarımları
+    const newsDefs = [
+        { cnt: 1, title: 'Haber Takipçisi', icon: '📰', rarity: 'common' },
+        { cnt: 10, title: 'Anime Gazetecisi', icon: '🗞️', rarity: 'rare' },
+        { cnt: 30, title: 'Bilgi Okyansu', icon: '🌊', rarity: 'epic' },
+    ] as any[];
+    newsDefs.forEach(({ cnt, title, icon, rarity }) =>
+        list.push({ id: `news-${cnt}`, title, description: `${cnt} haberi okudu.`, xpReward: cnt * 10, icon, conditionType: 'NEWS_COUNT', conditionValue: cnt, rarity }));
+    // ── Öneri/istek başarımları
+    list.push({ id: 'request-1', title: 'İlk Öneri', description: 'İlk anime önerini gönderdin.', xpReward: 30, icon: '💡', conditionType: 'REQUEST_COUNT', conditionValue: 1, rarity: 'common' });
+    list.push({ id: 'request-3', title: 'Yapım Yapımcısı', description: '3 anime önerisi gönderdin.', xpReward: 75, icon: '🎬', conditionType: 'REQUEST_COUNT', conditionValue: 3, rarity: 'rare' });
+    // ── Değerlendirme başarımları
+    const ratingDefs = [
+        { cnt: 1, title: 'İlk Eleştiri', icon: '⭐', rarity: 'common' },
+        { cnt: 10, title: 'Anime Eleştirmeni', icon: '🎭', rarity: 'rare' },
+        { cnt: 50, title: 'Puan Ustası', icon: '🏅', rarity: 'epic' },
+    ] as any[];
+    ratingDefs.forEach(({ cnt, title, icon, rarity }) =>
+        list.push({ id: `rating-${cnt}`, title, description: `${cnt} anime değerlendirdi.`, xpReward: cnt * 8, icon, conditionType: 'RATING_COUNT', conditionValue: cnt, rarity }));
     return list;
 };
 
@@ -166,8 +204,18 @@ const applyXp = (profile: any, amount: number): any => {
     return profile;
 };
 
-const applyAchievements = (profile: any, commentsCount?: number): any => {
-    const watchedCount = (profile.watched_episodes || []).length;
+type XpCounts = {
+    commentsCount?: number;
+    watchCount?: number;
+    friendsCount?: number;
+    messagesCount?: number;
+    newsCount?: number;
+    requestsCount?: number;
+    ratingsCount?: number;
+};
+
+const applyAchievements = (profile: any, counts: XpCounts = {}): any => {
+    const watchedCount = counts.watchCount ?? (profile.watched_episodes || []).length;
     const listCount = (profile.watchlist || []).length;
     const customListCount = (profile.custom_lists || []).length;
     ACHIEVEMENTS.forEach(ach => {
@@ -176,8 +224,13 @@ const applyAchievements = (profile: any, commentsCount?: number): any => {
         if (ach.conditionType === 'WATCH_COUNT' && watchedCount >= ach.conditionValue) earned = true;
         if (ach.conditionType === 'LIST_COUNT' && listCount >= ach.conditionValue) earned = true;
         if (ach.conditionType === 'LEVEL_REACHED' && (profile.level || 1) >= ach.conditionValue) earned = true;
-        if (ach.conditionType === 'COMMENT_COUNT' && commentsCount !== undefined && commentsCount >= ach.conditionValue) earned = true;
+        if (ach.conditionType === 'COMMENT_COUNT' && counts.commentsCount !== undefined && counts.commentsCount >= ach.conditionValue) earned = true;
         if (ach.conditionType === 'LIST_CREATED_COUNT' && customListCount >= ach.conditionValue) earned = true;
+        if (ach.conditionType === 'FRIEND_COUNT' && counts.friendsCount !== undefined && counts.friendsCount >= ach.conditionValue) earned = true;
+        if (ach.conditionType === 'MESSAGE_COUNT' && counts.messagesCount !== undefined && counts.messagesCount >= ach.conditionValue) earned = true;
+        if (ach.conditionType === 'NEWS_COUNT' && counts.newsCount !== undefined && counts.newsCount >= ach.conditionValue) earned = true;
+        if (ach.conditionType === 'REQUEST_COUNT' && counts.requestsCount !== undefined && counts.requestsCount >= ach.conditionValue) earned = true;
+        if (ach.conditionType === 'RATING_COUNT' && counts.ratingsCount !== undefined && counts.ratingsCount >= ach.conditionValue) earned = true;
         if (earned) {
             profile.earned_achievements = [...(profile.earned_achievements || []), ach.id];
             profile = applyXp(profile, ach.xpReward);
@@ -188,6 +241,23 @@ const applyAchievements = (profile: any, commentsCount?: number): any => {
         }
     });
     return profile;
+};
+
+// ─── XP event dedup helper ────────────────────────────────────────────────────
+// Returns true if XP was granted (first time), false if already granted
+const tryXpEvent = async (userId: string, eventType: string, eventKey: string, xpAmount: number, counts: XpCounts = {}): Promise<boolean> => {
+    const { error } = await supabase.from('xp_events').insert({ user_id: userId, event_type: eventType, event_key: eventKey });
+    if (error) return false; // UNIQUE violation = already granted
+    let profile = await fetchProfile(userId);
+    profile = applyXp(profile, xpAmount);
+    profile = applyAchievements(profile, counts);
+    await saveProfile(profile);
+    return true;
+};
+
+const getEventCount = async (userId: string, eventType: string): Promise<number> => {
+    const { count } = await supabase.from('xp_events').select('*', { count: 'exact', head: true }).eq('user_id', userId).eq('event_type', eventType);
+    return count || 0;
 };
 
 const saveProfile = async (profile: any) => {
@@ -241,6 +311,8 @@ export const login = async (emailOrUsername: string, password: string): Promise<
     const profile = await fetchProfile(data.user.id);
     if (profile.is_banned) { await supabase.auth.signOut(); throw new Error('Bu hesap engellenmiştir.'); }
     const user = mapProfile(profile, email);
+    // Daily login XP (fire and forget)
+    grantLoginXP(data.user.id).catch(() => {});
     return { user, token: data.session.access_token };
 };
 
@@ -383,12 +455,45 @@ export const unmarkEpisodeWatched = async (userId: string, episodeId: string) =>
 };
 
 export const grantWatchXP = async (userId: string, episodeId: string) => {
-    let profile = await fetchProfile(userId);
-    if ((profile.watched_episodes || []).includes(episodeId)) return;
-    profile.watched_episodes = [...(profile.watched_episodes || []), episodeId];
-    profile = applyXp(profile, 50);
-    profile = applyAchievements(profile);
-    await saveProfile(profile);
+    const watchCount = await getEventCount(userId, 'watch_ep') + 1;
+    await tryXpEvent(userId, 'watch_ep', episodeId, 50, { watchCount });
+};
+
+export const grantFriendXP = async (userId: string, friendId: string) => {
+    const eventKey = [userId, friendId].sort().join('_');
+    const friendsCount = await getEventCount(userId, 'friend_add') + 1;
+    await tryXpEvent(userId, 'friend_add', eventKey, 30, { friendsCount });
+};
+
+export const grantMessageXP = async (userId: string) => {
+    // Max 15 messages XP per day
+    const today = new Date().toISOString().slice(0, 10);
+    const { count: todayCount } = await supabase.from('xp_events')
+        .select('*', { count: 'exact', head: true }).eq('user_id', userId).eq('event_type', 'msg').gte('created_at', `${today}T00:00:00Z`);
+    if ((todayCount || 0) >= 15) return;
+    const eventKey = `${today}-${Date.now()}-${Math.random()}`;
+    const messagesCount = await getEventCount(userId, 'msg') + 1;
+    await tryXpEvent(userId, 'msg', eventKey, 2, { messagesCount });
+};
+
+export const grantNewsReadXP = async (userId: string, newsId: string) => {
+    const newsCount = await getEventCount(userId, 'news_read') + 1;
+    await tryXpEvent(userId, 'news_read', newsId, 10, { newsCount });
+};
+
+export const grantRequestXP = async (userId: string, requestId: string) => {
+    const requestsCount = await getEventCount(userId, 'request') + 1;
+    await tryXpEvent(userId, 'request', requestId, 20, { requestsCount });
+};
+
+export const grantRatingXP = async (userId: string, animeId: string) => {
+    const ratingsCount = await getEventCount(userId, 'rating') + 1;
+    await tryXpEvent(userId, 'rating', animeId, 15, { ratingsCount });
+};
+
+export const grantLoginXP = async (userId: string) => {
+    const today = new Date().toISOString().slice(0, 10);
+    await tryXpEvent(userId, 'login', today, 10);
 };
 
 export const toggleLikeEpisode = async (userId: string, _animeId: string, episodeId: string) => {
@@ -417,7 +522,7 @@ export const addComment = async (data: any) => {
         let profile = await fetchProfile(data.userId);
         profile = applyXp(profile, 10);
         const { count } = await supabase.from('comments').select('*', { count: 'exact', head: true }).eq('user_id', data.userId);
-        profile = applyAchievements(profile, count || 0);
+        profile = applyAchievements(profile, { commentsCount: count || 0 });
         await saveProfile(profile);
     } catch {}
 
@@ -570,6 +675,11 @@ export const saveAnimeEntry = async (userId: string, animeId: string, entry: { s
     profile.anime_list = animeList;
     await saveProfile(profile);
 
+    // Grant rating XP (once per anime)
+    if (entry.rating) {
+        await grantRatingXP(userId, animeId);
+    }
+
     if (entry.rating) {
         await supabase.from('anime_ratings').upsert({ user_id: userId, anime_id: animeId, rating: entry.rating });
         const { data: ratings } = await supabase.from('anime_ratings').select('rating').eq('anime_id', animeId);
@@ -688,7 +798,7 @@ export const deleteUser = async (userId: string) => {
 
 const REQUEST_RATE_KEY = 'anipal_last_request';
 
-export const submitAnimeRequest = async (userId: string, username: string, displayName: string, animeName: string, note: string): Promise<void> => {
+export const submitAnimeRequest = async (userId: string, username: string, displayName: string, animeName: string, note: string): Promise<{ id: string } | null> => {
     // Rate limit: 1 per day (localStorage)
     const lastReq = localStorage.getItem(REQUEST_RATE_KEY);
     if (lastReq) {
@@ -698,16 +808,12 @@ export const submitAnimeRequest = async (userId: string, username: string, displ
             throw new Error(`Günde yalnızca 1 istek yapabilirsiniz. ${hoursLeft} saat sonra tekrar deneyin.`);
         }
     }
-    const { error } = await supabase.from('anime_requests').insert({
-        user_id: userId,
-        username,
-        display_name: displayName,
-        anime_name: animeName,
-        note,
-        status: 'pending',
-    });
+    const { data, error } = await supabase.from('anime_requests').insert({
+        user_id: userId, username, display_name: displayName, anime_name: animeName, note, status: 'pending',
+    }).select('id').single();
     if (error) throw new Error(error.message);
     localStorage.setItem(REQUEST_RATE_KEY, Date.now().toString());
+    return data;
 };
 
 export const getAnimeRequests = async (): Promise<import('../types').AnimeRequest[]> => {
