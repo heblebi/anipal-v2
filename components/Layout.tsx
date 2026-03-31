@@ -45,6 +45,22 @@ const Layout = ({ children }: { children?: React.ReactNode }) => {
 
   const location = useLocation();
 
+  // Unique visitor tracking — counts each device once per day
+  useEffect(() => {
+    try {
+      const TODAY = new Date().toISOString().slice(0, 10);
+      const myKey = 'anipal_my_visit';
+      if (localStorage.getItem(myKey) !== TODAY) {
+        localStorage.setItem(myKey, TODAY);
+        const KEY = 'anipal_visitors';
+        const visitors: Record<string, number> = JSON.parse(localStorage.getItem(KEY) || '{}');
+        visitors[TODAY] = (visitors[TODAY] || 0) + 1;
+        const sorted = Object.entries(visitors).sort(([a], [b]) => b.localeCompare(a)).slice(0, 30);
+        localStorage.setItem(KEY, JSON.stringify(Object.fromEntries(sorted)));
+      }
+    } catch {}
+  }, []);
+
   useEffect(() => {
       const handleScroll = () => setScrolled(window.scrollY > 20);
       window.addEventListener('scroll', handleScroll);

@@ -17,7 +17,7 @@ interface EmbedResult {
   error?: string;
   url?: string;
 }
-import { Activity, Download, Users, CheckCircle, ShieldAlert, PlaySquare, Search, Shield, Plus, Trash2, Image, ChevronDown, ChevronRight, Pencil, X, Save, Globe, Loader2, CheckCircle2, AlertCircle, ImageIcon, Upload, Send, UserX, Flag } from 'lucide-react';
+import { Activity, Download, Users, CheckCircle, ShieldAlert, PlaySquare, Search, Shield, Plus, Trash2, Image, ChevronDown, ChevronRight, Pencil, X, Save, Globe, Loader2, CheckCircle2, AlertCircle, ImageIcon, Upload, Send, UserX, Flag, MessageSquare } from 'lucide-react';
 import ImageCropModal from '../components/ImageCropModal';
 import { SITE_ASSETS, SiteAsset } from '../services/siteSettings';
 import { useSiteSettings } from '../context/SiteSettingsContext';
@@ -35,7 +35,8 @@ const AdminDashboard = () => {
   const { user, isLoading: authLoading } = useAuth();
   const navigate = useNavigate();
   const isEditor = user?.role === UserRole.EDITOR;
-  const [activeTab, setActiveTab] = useState<'stats' | 'episodes' | 'moderation' | 'users' | 'manage' | 'news' | 'assets' | 'requests' | 'reports'>(isEditor ? 'news' : 'stats');
+  const [activeTab, setActiveTab] = useState<'stats' | 'manage' | 'news' | 'moderation' | 'users' | 'assets' | 'community'>(isEditor ? 'news' : 'stats');
+  const [communityTab, setCommunityTab] = useState<'requests' | 'reports'>('requests');
   const { settings: siteSettings, uploadAndSave } = useSiteSettings();
   const [assetCrop, setAssetCrop] = useState<{ src: string; asset: SiteAsset } | null>(null);
   const [assetSaving, setAssetSaving] = useState<string | null>(null);
@@ -44,6 +45,7 @@ const AdminDashboard = () => {
   const [requestsLoading, setRequestsLoading] = useState(false);
   const [reports, setReports] = useState<Report[]>([]);
   const [reportsLoading, setReportsLoading] = useState(false);
+  const [visitorCount, setVisitorCount] = useState(0);
   const assetFileRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const [animes, setAnimes] = useState<Anime[]>([]);
   const [stats, setStats] = useState<SiteStats | null>(null);
@@ -132,7 +134,35 @@ const AdminDashboard = () => {
     try { setRequests(await getAnimeRequests()); } catch { /* ignore */ } finally { setRequestsLoading(false); }
   };
 
+  const loadReports = async () => {
+    setReportsLoading(true);
+    try { setReports(await getReports()); } catch { /* ignore */ } finally { setReportsLoading(false); }
+  };
+
+  // Unique visitor count (localStorage based, device+browser = 1 visit per day)
+  const getVisitorCount = () => {
+    try {
+      const KEY = 'anipal_visitors';
+      const TODAY = new Date().toISOString().slice(0, 10);
+      // Register this device's visit
+      const myKey = 'anipal_my_visit';
+      const myVisit = localStorage.getItem(myKey);
+      if (myVisit !== TODAY) {
+        localStorage.setItem(myKey, TODAY);
+        const visitors: Record<string, number> = JSON.parse(localStorage.getItem(KEY) || '{}');
+        visitors[TODAY] = (visitors[TODAY] || 0) + 1;
+        // Keep last 30 days only
+        const sorted = Object.entries(visitors).sort(([a], [b]) => b.localeCompare(a)).slice(0, 30);
+        localStorage.setItem(KEY, JSON.stringify(Object.fromEntries(sorted)));
+      }
+      const visitors: Record<string, number> = JSON.parse(localStorage.getItem(KEY) || '{}');
+      const total = Object.values(visitors).reduce((a, b) => a + b, 0);
+      setVisitorCount(total);
+    } catch {}
+  };
+
   const loadData = async () => {
+    getVisitorCount();
     try {
       const isAdmin = user?.role === UserRole.ADMIN;
       const [nl, animeData, statsData, userData] = await Promise.all([
@@ -426,26 +456,18 @@ const AdminDashboard = () => {
           {!isModerator && !isEditor && (
              <TabButton active={activeTab==='stats'} onClick={()=>setActiveTab('stats')} icon={<Activity size={18}/>}>İstatistikler</TabButton>
           )}
+          <TabButton active={activeTab==='news'} onClick={()=>setActiveTab('news')} icon={<Activity size={18}/>}>Haberler</TabButton>
           {!isEditor && (
             <>
-              <button
-                onClick={() => navigate('/admin/add-anime')}
-                className="flex items-center gap-2 px-4 py-3 font-medium text-sm text-gray-400 hover:text-amber-500 border-b-2 border-transparent transition-colors"
-              >
-                <PlaySquare size={18}/> Anime Ekle
-              </button>
-              <TabButton active={activeTab==='episodes'} onClick={()=>setActiveTab('episodes')} icon={<Download size={18}/>}>Bölüm Yükle</TabButton>
+              <TabButton active={activeTab==='manage'} onClick={()=>setActiveTab('manage')} icon={<Trash2 size={18}/>}>Düzenle & Sil</TabButton>
             </>
           )}
-          <TabButton active={activeTab==='news'} onClick={()=>setActiveTab('news')} icon={<Activity size={18}/>}>Haberler</TabButton>
           {!isModerator && !isEditor && (
              <>
                 <TabButton active={activeTab==='moderation'} onClick={()=>setActiveTab('moderation')} icon={<CheckCircle size={18}/>}>Onay Bekleyenler</TabButton>
                 <TabButton active={activeTab==='users'} onClick={()=>setActiveTab('users')} icon={<Users size={18}/>}>Kullanıcılar</TabButton>
-                <TabButton active={activeTab==='manage'} onClick={()=>setActiveTab('manage')} icon={<Trash2 size={18}/>}>Düzenle & Sil</TabButton>
+                <TabButton active={activeTab==='community'} onClick={()=>{ setActiveTab('community'); loadRequests(); loadReports(); }} icon={<Flag size={18}/>}>İstek & Şikayetler</TabButton>
                 <TabButton active={activeTab==='assets'} onClick={()=>setActiveTab('assets')} icon={<ImageIcon size={18}/>}>Site Görselleri</TabButton>
-                <TabButton active={activeTab==='requests'} onClick={()=>{ setActiveTab('requests'); loadRequests(); }} icon={<Send size={18}/>}>İstekler</TabButton>
-                <TabButton active={activeTab==='reports'} onClick={async ()=>{ setActiveTab('reports'); setReportsLoading(true); try { setReports(await getReports()); } catch { } finally { setReportsLoading(false); } }} icon={<Flag size={18}/>}>Şikayetler</TabButton>
              </>
           )}
       </div>
@@ -460,11 +482,47 @@ const AdminDashboard = () => {
       
       {activeTab === 'stats' && (
         stats ? (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-6">
+          <div className="space-y-6">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-6">
               <StatCard title="Toplam Kullanıcı" value={stats.totalUsers} icon={<Users className="text-blue-500"/>} />
               <StatCard title="Toplam Anime" value={stats.totalAnimes} icon={<PlaySquare className="text-purple-500"/>} />
               <StatCard title="Onay Bekleyen" value={stats.pendingAnimes} icon={<CheckCircle className="text-amber-500"/>} />
               <StatCard title="Toplam Yorum" value={stats.totalComments} icon={<Activity className="text-green-500"/>} />
+            </div>
+            <div className="bg-[#18181b] border border-gray-800 rounded-xl p-5">
+              <h3 className="text-white font-bold text-sm mb-4 flex items-center gap-2"><Globe size={16} className="text-amber-500"/> Site Trafiği</h3>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="bg-gray-900 rounded-xl p-4 text-center">
+                  <p className="text-3xl font-black text-amber-500">{visitorCount}</p>
+                  <p className="text-xs text-gray-500 mt-1">Son 30 gün ziyaretçi</p>
+                  <p className="text-[10px] text-gray-600 mt-1">Her cihaz günde 1 kez sayılır</p>
+                </div>
+                <div className="bg-gray-900 rounded-xl p-4 text-center">
+                  <p className="text-3xl font-black text-blue-400">
+                    {(() => {
+                      try {
+                        const visitors: Record<string, number> = JSON.parse(localStorage.getItem('anipal_visitors') || '{}');
+                        const today = new Date().toISOString().slice(0, 10);
+                        return visitors[today] || 0;
+                      } catch { return 0; }
+                    })()}
+                  </p>
+                  <p className="text-xs text-gray-500 mt-1">Bugünkü ziyaretçi</p>
+                </div>
+                <div className="bg-gray-900 rounded-xl p-4 text-center">
+                  <p className="text-3xl font-black text-green-400">
+                    {(() => {
+                      try {
+                        const visitors: Record<string, number> = JSON.parse(localStorage.getItem('anipal_visitors') || '{}');
+                        const entries = Object.entries(visitors).sort(([a], [b]) => b.localeCompare(a));
+                        return entries.length > 0 ? Math.max(...Object.values(visitors)) : 0;
+                      } catch { return 0; }
+                    })()}
+                  </p>
+                  <p className="text-xs text-gray-500 mt-1">Tek günde en fazla</p>
+                </div>
+              </div>
+            </div>
           </div>
         ) : (
           <div className="flex items-center justify-center py-20">
@@ -589,6 +647,11 @@ const AdminDashboard = () => {
 
       {activeTab === 'manage' && (
           <div className="space-y-3">
+              <div className="flex gap-2 flex-wrap">
+                <button onClick={() => navigate('/admin/add-anime')} className="flex items-center gap-2 px-4 py-2 bg-amber-500 hover:bg-amber-400 text-black font-bold text-sm rounded-xl transition-colors">
+                  <PlaySquare size={15}/> Anime Ekle
+                </button>
+              </div>
               {/* Search bar */}
               <div className="relative">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={16} />
@@ -667,10 +730,10 @@ const AdminDashboard = () => {
                               ))}
                               <div className="p-3 border-t border-gray-800">
                                   <button
-                                      onClick={() => setActiveTab('episodes')}
-                                      className="text-xs text-amber-500 hover:text-amber-400 font-medium"
+                                      onClick={() => navigate(`/admin/add-episode/${anime.id}`)}
+                                      className="text-xs text-amber-500 hover:text-amber-400 font-medium flex items-center gap-1"
                                   >
-                                      + Bu animeye bölüm ekle
+                                      <Plus size={11}/> Bu animeye bölüm ekle
                                   </button>
                               </div>
                           </div>
@@ -963,19 +1026,25 @@ const AdminDashboard = () => {
            </div>
       )}
       
-      {activeTab === 'requests' && (
+      {activeTab === 'community' && (
         <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-bold text-white flex items-center gap-2"><Send size={18} className="text-amber-500" /> İstekler & Öneriler</h2>
-            <button onClick={loadRequests} className="text-xs text-gray-400 hover:text-white border border-gray-700 px-3 py-1.5 rounded-lg transition-colors">Yenile</button>
+          {/* Inner tabs */}
+          <div className="flex gap-2 border-b border-gray-800 pb-1">
+            <button onClick={() => setCommunityTab('requests')} className={`flex items-center gap-2 px-4 py-2.5 text-sm font-bold transition-colors border-b-2 -mb-px ${communityTab === 'requests' ? 'text-amber-500 border-amber-500' : 'text-gray-400 border-transparent hover:text-white'}`}>
+              <Send size={15}/> İstekler & Öneriler <span className="bg-gray-800 text-gray-400 text-[10px] px-1.5 py-0.5 rounded-full">{requests.length}</span>
+            </button>
+            <button onClick={() => setCommunityTab('reports')} className={`flex items-center gap-2 px-4 py-2.5 text-sm font-bold transition-colors border-b-2 -mb-px ${communityTab === 'reports' ? 'text-amber-500 border-amber-500' : 'text-gray-400 border-transparent hover:text-white'}`}>
+              <Flag size={15}/> Şikayetler <span className="bg-gray-800 text-gray-400 text-[10px] px-1.5 py-0.5 rounded-full">{reports.filter(r => r.status === 'pending').length}</span>
+            </button>
           </div>
-          {requestsLoading ? (
-            <div className="text-center py-10 text-gray-500">Yükleniyor...</div>
-          ) : requests.length === 0 ? (
-            <div className="text-center py-10 text-gray-500">Henüz istek yok.</div>
-          ) : (
+
+          {communityTab === 'requests' && (
             <div className="space-y-3">
-              {requests.map(req => (
+              {requestsLoading ? (
+                <div className="text-center py-10 text-gray-500">Yükleniyor...</div>
+              ) : requests.length === 0 ? (
+                <div className="text-center py-10 text-gray-500">Henüz istek yok.</div>
+              ) : requests.map(req => (
                 <div key={req.id} className="bg-gray-900 border border-gray-800 rounded-xl p-4 flex items-start gap-4">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap mb-1">
@@ -993,31 +1062,22 @@ const AdminDashboard = () => {
                   </div>
                   {req.status === 'pending' && (
                     <div className="flex gap-2 flex-shrink-0">
-                      <button onClick={async () => { try { await updateAnimeRequestStatus(req.id, 'approved'); loadRequests(); } catch(e: any) { alert(e.message); } }} className="text-xs font-bold px-3 py-1.5 rounded-lg bg-green-500/10 text-green-400 border border-green-500/30 hover:bg-green-500/20 transition-colors">
-                        Onayla
-                      </button>
-                      <button onClick={async () => { try { await updateAnimeRequestStatus(req.id, 'rejected'); loadRequests(); } catch(e: any) { alert(e.message); } }} className="text-xs font-bold px-3 py-1.5 rounded-lg bg-red-500/10 text-red-400 border border-red-500/30 hover:bg-red-500/20 transition-colors">
-                        Reddet
-                      </button>
+                      <button onClick={async () => { try { await updateAnimeRequestStatus(req.id, 'approved'); loadRequests(); } catch(e: any) { alert(e.message); } }} className="text-xs font-bold px-3 py-1.5 rounded-lg bg-green-500/10 text-green-400 border border-green-500/30 hover:bg-green-500/20 transition-colors">Onayla</button>
+                      <button onClick={async () => { try { await updateAnimeRequestStatus(req.id, 'rejected'); loadRequests(); } catch(e: any) { alert(e.message); } }} className="text-xs font-bold px-3 py-1.5 rounded-lg bg-red-500/10 text-red-400 border border-red-500/30 hover:bg-red-500/20 transition-colors">Reddet</button>
                     </div>
                   )}
                 </div>
               ))}
             </div>
           )}
-        </div>
-      )}
 
-      {activeTab === 'reports' && (
-        <div className="space-y-4">
-          <h2 className="text-lg font-bold text-white flex items-center gap-2"><Flag size={18} className="text-red-400" /> Şikayetler</h2>
-          {reportsLoading ? (
-            <div className="text-gray-500 text-sm">Yükleniyor...</div>
-          ) : reports.length === 0 ? (
-            <div className="text-center py-12 text-gray-600 text-sm">Şikayet yok.</div>
-          ) : (
+          {communityTab === 'reports' && (
             <div className="space-y-3">
-              {reports.map(r => (
+              {reportsLoading ? (
+                <div className="text-gray-500 text-sm text-center py-10">Yükleniyor...</div>
+              ) : reports.length === 0 ? (
+                <div className="text-center py-12 text-gray-600 text-sm">Şikayet yok.</div>
+              ) : reports.map(r => (
                 <div key={r.id} className="bg-[#18181b] border border-gray-800 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center gap-4">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
@@ -1046,9 +1106,8 @@ const AdminDashboard = () => {
         </div>
       )}
 
-      {activeTab === 'episodes' && (
+      {false && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Sol: Anime seç + mevcut bölümler */}
           <div className="space-y-4">
             <select
               className="w-full bg-gray-800 border border-gray-700 rounded-lg p-3 text-white focus:border-amber-500 focus:outline-none"
