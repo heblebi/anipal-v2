@@ -26,6 +26,8 @@ const Layout = ({ children }: { children?: React.ReactNode }) => {
   // Profile dropdown
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const profileMenuRef = useRef<HTMLDivElement>(null);
+  const notifRef = useRef<HTMLDivElement>(null);
+  const mobileNotifRef = useRef<HTMLDivElement>(null);
 
   // Chat
   const [showChat, setShowChat] = useState(false);
@@ -150,6 +152,19 @@ const Layout = ({ children }: { children?: React.ReactNode }) => {
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
+  // Close notification panel on outside click
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      const inDesktop = notifRef.current?.contains(e.target as Node);
+      const inMobile = mobileNotifRef.current?.contains(e.target as Node);
+      if (!inDesktop && !inMobile) {
+        setShowNotifs(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
   const handleNotifClick = async () => {
       setShowNotifs(!showNotifs);
       if (!showNotifs && unreadCount > 0 && user) {
@@ -204,7 +219,7 @@ const Layout = ({ children }: { children?: React.ReactNode }) => {
                    )}
 
                    {/* Notification Bell */}
-                   <div className="relative">
+                   <div className="relative" ref={notifRef}>
                        <button onClick={handleNotifClick} className="relative p-2 text-gray-300 hover:text-white">
                            <Bell size={20} />
                            {unreadCount > 0 && (
@@ -214,7 +229,7 @@ const Layout = ({ children }: { children?: React.ReactNode }) => {
 
                        {/* Dropdown */}
                        {showNotifs && (
-                           <div className="absolute right-0 mt-2 w-[calc(100vw-2rem)] max-w-sm bg-[#18181b] border border-gray-800 rounded-xl shadow-2xl overflow-hidden animate-in fade-in slide-in-from-top-2">
+                           <div className="absolute right-0 mt-2 w-80 bg-[#18181b] border border-gray-800 rounded-xl shadow-2xl overflow-hidden animate-in fade-in slide-in-from-top-2 z-50">
                                <div className="p-3 border-b border-gray-800 flex items-center justify-between">
                                    <span className="font-bold text-sm text-gray-300">Bildirimler</span>
                                    {notifications.length > 0 && (
@@ -425,15 +440,76 @@ const Layout = ({ children }: { children?: React.ReactNode }) => {
               )}
             </div>
 
-            {/* Mobile: bell + menu */}
+            {/* Mobile: bell + chat + menu */}
             <div className="md:hidden flex items-center gap-1">
               {isAuthenticated && user && (
-                <button onClick={handleNotifClick} className="relative p-3 text-gray-300 hover:text-white">
-                  <Bell size={20} />
-                  {unreadCount > 0 && (
-                    <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full animate-pulse border border-[#0f0f10]"></span>
-                  )}
-                </button>
+                <>
+                  <div className="relative" ref={mobileNotifRef}>
+                    <button onClick={handleNotifClick} className="relative p-3 text-gray-300 hover:text-white">
+                      <Bell size={20} />
+                      {unreadCount > 0 && (
+                        <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full animate-pulse border border-[#0f0f10]"></span>
+                      )}
+                    </button>
+                    {/* Mobile notification dropdown */}
+                    {showNotifs && (
+                      <div className="absolute right-0 mt-2 w-[calc(100vw-2rem)] max-w-sm bg-[#18181b] border border-gray-800 rounded-xl shadow-2xl overflow-hidden animate-in fade-in slide-in-from-top-2 z-50">
+                        <div className="p-3 border-b border-gray-800 flex items-center justify-between">
+                          <span className="font-bold text-sm text-gray-300">Bildirimler</span>
+                          {notifications.length > 0 && (
+                            <button
+                              onClick={async () => {
+                                if (!user) return;
+                                await clearNotifications(user.id);
+                                setNotifications([]);
+                                setUnreadCount(0);
+                              }}
+                              className="text-[11px] text-gray-500 hover:text-red-400 transition-colors font-medium"
+                            >
+                              Tümünü Temizle
+                            </button>
+                          )}
+                        </div>
+                        <div className="max-h-72 overflow-y-auto custom-scrollbar">
+                          {notifications.length > 0 ? (
+                            notifications.map(notif => {
+                              const notifLink = notif.type === 'FOLLOW' ? '/social?tab=requests' : notif.type === 'ANIME_REQUEST' ? '/request' : null;
+                              const inner = (
+                                <div className="flex items-start gap-3">
+                                  <div className="text-xl">
+                                    {notif.type === 'LEVEL_UP' && '🆙'}
+                                    {notif.type === 'BADGE_EARNED' && '🏆'}
+                                    {notif.type === 'NEW_EPISODE' && '📺'}
+                                    {notif.type === 'FOLLOW' && '👤'}
+                                    {notif.type === 'ANIME_REQUEST' && '🎌'}
+                                  </div>
+                                  <div>
+                                    <p className="text-xs font-bold text-amber-500 mb-0.5">{notif.title}</p>
+                                    <p className="text-xs text-gray-300 leading-tight">{notif.message}</p>
+                                    <p className="text-[10px] text-gray-600 mt-1">{new Date(notif.createdAt).toLocaleTimeString()}</p>
+                                  </div>
+                                </div>
+                              );
+                              return notifLink ? (
+                                <Link key={notif.id} to={notifLink} onClick={() => setShowNotifs(false)} className={`block p-3 border-b border-gray-800/50 hover:bg-gray-800 transition-colors cursor-pointer ${!notif.isRead ? 'bg-amber-500/5' : ''}`}>{inner}</Link>
+                              ) : (
+                                <div key={notif.id} className={`p-3 border-b border-gray-800/50 hover:bg-gray-800 transition-colors ${!notif.isRead ? 'bg-amber-500/5' : ''}`}>{inner}</div>
+                              );
+                            })
+                          ) : (
+                            <div className="p-4 text-center text-xs text-gray-500">Bildirim yok.</div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  <button onClick={() => { setShowChat(true); setIsMobileMenuOpen(false); }} className="relative p-3 text-gray-300 hover:text-white">
+                    <MessageCircle size={20} />
+                    {unreadMsgs > 0 && (
+                      <span className="absolute top-2 right-2 w-2 h-2 bg-amber-500 rounded-full border border-[#0f0f10]"></span>
+                    )}
+                  </button>
+                </>
               )}
               <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="text-white p-3">
                 {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
@@ -479,6 +555,18 @@ const Layout = ({ children }: { children?: React.ReactNode }) => {
                         <div className="text-amber-500 text-xs">Seviye {user.level}</div>
                       </div>
                     </Link>
+                    <Link to="/social" onClick={() => setIsMobileMenuOpen(false)}
+                      className="flex items-center gap-2 py-3 text-gray-400 border-b border-gray-800 text-sm"
+                    >
+                      <Users size={16} /> Arkadaşlar
+                      {pendingReqs.length > 0 && <span className="ml-auto bg-amber-500 text-black text-[10px] font-black px-1.5 py-0.5 rounded-full">{pendingReqs.length}</span>}
+                    </Link>
+                    <button onClick={() => { setShowChat(true); setIsMobileMenuOpen(false); }}
+                      className="flex items-center gap-2 py-3 text-gray-400 border-b border-gray-800 text-sm w-full"
+                    >
+                      <MessageCircle size={16} /> Mesajlar
+                      {unreadMsgs > 0 && <span className="ml-auto bg-amber-500 text-black text-[10px] font-black px-1.5 py-0.5 rounded-full">{unreadMsgs}</span>}
+                    </button>
                     <Link to="/settings" onClick={() => setIsMobileMenuOpen(false)}
                       className="flex items-center gap-2 py-3 text-gray-400 border-b border-gray-800 text-sm"
                     ><Settings size={16} /> Ayarlar</Link>
