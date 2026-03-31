@@ -632,6 +632,16 @@ export const getCommentsByEpisodeId = async (episodeId: string): Promise<Comment
     return (data || []).map(c => ({ id: c.id, episodeId: c.episode_id, userId: c.user_id, username: c.username, content: c.content, isSpoiler: c.is_spoiler, createdAt: c.created_at }));
 };
 
+export const deleteComment = async (commentId: string, requestingUserId: string) => {
+    const { data: comment } = await supabase.from('comments').select('user_id').eq('id', commentId).single();
+    if (!comment) throw new Error('Yorum bulunamadı.');
+    const { data: profile } = await supabase.from('profiles').select('role').eq('id', requestingUserId).single();
+    const isAdmin = profile?.role === 'admin' || profile?.role === 'moderator';
+    if (comment.user_id !== requestingUserId && !isAdmin) throw new Error('Bu yorumu silme yetkiniz yok.');
+    const { error } = await supabase.from('comments').delete().eq('id', commentId);
+    if (error) throw new Error(error.message);
+};
+
 export const getUserComments = async (userId: string) => {
     const { data } = await supabase.from('comments').select('*').eq('user_id', userId).order('created_at', { ascending: false });
     return (data || []).map(c => ({ id: c.id, episodeId: c.episode_id, userId: c.user_id, username: c.username, content: c.content, isSpoiler: c.is_spoiler, createdAt: c.created_at }));

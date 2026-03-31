@@ -1,19 +1,34 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { getCommentsByEpisodeId, addComment } from '../services/mockBackend';
+import { getCommentsByEpisodeId, addComment, deleteComment } from '../services/mockBackend';
 import { Comment } from '../types';
 import Button from './Button';
 import ReportModal from './ReportModal';
-import { MessageSquare, AlertTriangle, Eye, EyeOff, Flag } from 'lucide-react';
+import { MessageSquare, AlertTriangle, Eye, EyeOff, Flag, Trash2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { UserRole } from '../types';
 
 interface CommentSectionProps {
   episodeId: string;
 }
 
-const SingleComment: React.FC<{ comment: Comment; currentUserId?: string }> = ({ comment, currentUserId }) => {
+const SingleComment: React.FC<{ comment: Comment; currentUserId?: string; currentUserRole?: string; onDelete: (id: string) => void }> = ({ comment, currentUserId, currentUserRole, onDelete }) => {
   const [isRevealed, setIsRevealed] = useState(!comment.isSpoiler);
   const [showReport, setShowReport] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  const canDelete = currentUserId && (currentUserId === comment.userId || currentUserRole === UserRole.ADMIN || currentUserRole === UserRole.MODERATOR);
+
+  const handleDelete = async () => {
+    if (!currentUserId || !window.confirm('Bu yorumu silmek istiyor musunuz?')) return;
+    setDeleting(true);
+    try {
+      await deleteComment(comment.id, currentUserId);
+      onDelete(comment.id);
+    } catch {} finally {
+      setDeleting(false);
+    }
+  };
 
   return (
     <div className="bg-gray-800/50 p-4 rounded-xl border border-gray-700/50 hover:border-gray-600 transition-colors">
@@ -41,6 +56,11 @@ const SingleComment: React.FC<{ comment: Comment; currentUserId?: string }> = ({
           {currentUserId && currentUserId !== comment.userId && (
             <button onClick={() => setShowReport(true)} className="p-1 text-gray-600 hover:text-red-400 transition-colors" title="Şikayet et">
               <Flag size={12} />
+            </button>
+          )}
+          {canDelete && (
+            <button onClick={handleDelete} disabled={deleting} className="p-1 text-gray-600 hover:text-red-400 transition-colors disabled:opacity-50" title="Yorumu sil">
+              <Trash2 size={12} />
             </button>
           )}
         </div>
@@ -147,7 +167,15 @@ const CommentSection: React.FC<CommentSectionProps> = ({ episodeId }) => {
 
       <div className="space-y-4">
         {comments.length > 0 ? (
-          comments.map(comment => <SingleComment key={comment.id} comment={comment} currentUserId={user?.id} />)
+          comments.map(comment => (
+            <SingleComment
+              key={comment.id}
+              comment={comment}
+              currentUserId={user?.id}
+              currentUserRole={user?.role}
+              onDelete={id => setComments(prev => prev.filter(c => c.id !== id))}
+            />
+          ))
         ) : (
           <div className="text-center py-10 text-gray-600">
             <p>Henüz yorum yapılmamış. İlk yorumu sen yap!</p>
