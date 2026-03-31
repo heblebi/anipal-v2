@@ -528,15 +528,87 @@ export const toggleLikeEpisode = async (userId: string, _animeId: string, episod
 
 // ─── Comments ─────────────────────────────────────────────────────────────────
 
+const BAD_WORDS = [
+    'amk', 'amına', 'amını', 'bok', 'göt', 'götveren', 'ibne', 'orospu', 'piç', 'piçlik',
+    'sik', 'sikerim', 'sikeyim', 'sikiş', 'sikişmek', 'oç', 'aq', 'a.q', 'a.k', 'mk',
+    'oğlum', 'yarrak', 'yarak', 'yarrak', 'götveren', 'kahpe', 'kaltak', 'sürtük', 'fahişe',
+    'pezevenk', 'bok', 'boktan', 'serefsiz', 'şerefsiz', 'gerizekalı', 'gerizekal',
+    'aptal', 'salak', 'dangalak', 'mal', 'maldır',
+];
+
+const containsBadWord = (text: string): boolean => {
+    const normalized = text.toLowerCase().replace(/[_\-.*]/g, '');
+    return BAD_WORDS.some(w => normalized.includes(w));
+};
+
+const countLinks = (text: string): number => {
+    return (text.match(/https?:\/\/\S+/gi) || []).length;
+};
+
 export const addComment = async (data: any) => {
+    const content: string = data.content?.trim() || '';
+
+    // Küfür filtresi
+    if (containsBadWord(content)) {
+        throw new Error('Yorumunuz uygunsuz ifadeler içeriyor. Lütfen düzenleyerek tekrar deneyin.');
+    }
+
+    // Max 2 link
+    if (countLinks(content) > 2) {
+        throw new Error('Yorumda en fazla 2 bağlantıya izin verilir.');
+    }
+
+    const now = Date.now();
+    const FAST_SPAM_KEY = `comment_times_${data.userId}`;
+    const DUPE_KEY = `comment_last_${data.userId}_${data.episodeId}`;
+    const SLOW_BLOCK_KEY = `comment_slow_block_${data.userId}`;
+    const FAST_BLOCK_KEY = `comment_fast_block_${data.userId}`;
+
+    // 1 saatlik hız bloğu kontrolü
+    const fastBlock = localStorage.getItem(FAST_BLOCK_KEY);
+    if (fastBlock && now < parseInt(fastBlock)) {
+        const remaining = Math.ceil((parseInt(fastBlock) - now) / 60000);
+        throw new Error(`Çok hızlı yorum yaptınız. ${remaining} dakika sonra tekrar deneyebilirsiniz.`);
+    }
+
+    // 30 dakikalık tekrar bloğu kontrolü
+    const slowBlock = localStorage.getItem(SLOW_BLOCK_KEY);
+    if (slowBlock && now < parseInt(slowBlock)) {
+        const remaining = Math.ceil((parseInt(slowBlock) - now) / 60000);
+        throw new Error(`Aynı içerikli yorum gönderdiniz. ${remaining} dakika sonra tekrar deneyebilirsiniz.`);
+    }
+
+    // Aynı içerik kontrolü (son yorum)
+    const lastDupe = localStorage.getItem(DUPE_KEY);
+    if (lastDupe) {
+        const { content: lastContent, time } = JSON.parse(lastDupe);
+        if (lastContent === content && now - time < 30 * 60 * 1000) {
+            localStorage.setItem(SLOW_BLOCK_KEY, String(now + 30 * 60 * 1000));
+            throw new Error('Aynı yorumu tekrar gönderemezsiniz. 30 dakika beklemeniz gerekiyor.');
+        }
+    }
+
+    // Hız kontrolü — son 10 saniyede 3'ten fazla yorum → 1 saat blok
+    const times: number[] = JSON.parse(localStorage.getItem(FAST_SPAM_KEY) || '[]');
+    const recent = times.filter(t => now - t < 10000);
+    if (recent.length >= 3) {
+        localStorage.setItem(FAST_BLOCK_KEY, String(now + 60 * 60 * 1000));
+        throw new Error('Çok hızlı yorum yapıyorsunuz. 1 saat boyunca yorum yapamazsınız.');
+    }
+    recent.push(now);
+    localStorage.setItem(FAST_SPAM_KEY, JSON.stringify(recent.slice(-10)));
+
     const { data: newC, error } = await supabase.from('comments').insert({
         episode_id: data.episodeId,
         user_id: data.userId,
         username: data.username,
-        content: data.content,
+        content,
         is_spoiler: data.isSpoiler || false,
     }).select().single();
     if (error) throw new Error(error.message);
+
+    // Son yorumu kaydet (dupe kontrolü için)
+    localStorage.setItem(DUPE_KEY, JSON.stringify({ content, time: now }));
 
     // XP for commenting
     try {

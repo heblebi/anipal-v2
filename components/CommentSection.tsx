@@ -76,25 +76,29 @@ const CommentSection: React.FC<CommentSectionProps> = ({ episodeId }) => {
   const [newComment, setNewComment] = useState('');
   const [isSpoiler, setIsSpoiler] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
   useEffect(() => { loadComments(); }, [episodeId]);
 
   const loadComments = async () => {
-    const data = await getCommentsByEpisodeId(episodeId);
-    setComments(data);
+    try {
+      const data = await getCommentsByEpisodeId(episodeId);
+      setComments(data);
+    } catch {}
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newComment.trim() || !user) return;
     setLoading(true);
+    setError('');
     try {
       await addComment({ episodeId, userId: user.id, username: user.username, content: newComment, isSpoiler });
       setNewComment('');
       setIsSpoiler(false);
       await loadComments();
-    } catch (error) {
-      console.error('Yorum yapılamadı', error);
+    } catch (err: any) {
+      setError(err.message || 'Yorum gönderilemedi.');
     } finally {
       setLoading(false);
     }
@@ -117,6 +121,9 @@ const CommentSection: React.FC<CommentSectionProps> = ({ episodeId }) => {
             onChange={e => setNewComment(e.target.value)}
             required
           />
+          {error && (
+            <p className="text-red-400 text-xs bg-red-400/10 border border-red-400/20 rounded-lg px-3 py-2">{error}</p>
+          )}
           <div className="flex items-center justify-between">
             <label className="flex items-center space-x-2 cursor-pointer text-gray-400 hover:text-white transition-colors">
               <input type="checkbox" checked={isSpoiler} onChange={e => setIsSpoiler(e.target.checked)} className="w-4 h-4 rounded border-gray-600 text-amber-500 focus:ring-amber-500 bg-gray-800" />
