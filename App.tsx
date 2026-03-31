@@ -11,6 +11,7 @@ import NewsDetailPage from './pages/NewsDetailPage';
 import AdminDashboard from './pages/AdminDashboard';
 import AdminLogin from './pages/AdminLogin';
 import AddAnimePage from './pages/AddAnimePage';
+import AddEpisodePage from './pages/AddEpisodePage';
 import ManagePanel from './pages/ManagePanel';
 import AnimePage from './pages/AnimePage';
 import Settings from './pages/Settings';
@@ -60,6 +61,7 @@ const AppRoutes = () => {
       <Route path="/admin" element={<AdminLogin />} />
       <Route path="/admin/dashboard" element={<ProtectedRoute requireRole={[UserRole.ADMIN]}><AdminDashboard /></ProtectedRoute>} />
       <Route path="/admin/add-anime" element={<ProtectedRoute requireRole={[UserRole.ADMIN]}><AddAnimePage /></ProtectedRoute>} />
+      <Route path="/admin/add-episode/:id" element={<ProtectedRoute requireRole={[UserRole.ADMIN]}><AddEpisodePage /></ProtectedRoute>} />
 
       {/* Moderatör / Editör paneli */}
       <Route path="/panel" element={
