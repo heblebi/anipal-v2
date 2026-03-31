@@ -2,7 +2,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { getUserById, getUserComments, updateUserProfile, getAllAchievements, getUserAnimeList, getAnimes, getUserLists, getPublicLists } from '../services/mockBackend';
-import { getFriendshipStatus, sendFriendRequest, removeFriend, blockUser, unblockUser } from '../services/socialBackend';
+import { getFriendshipStatus, sendFriendRequest, removeFriend, blockUser, unblockUser, acceptFriendRequest, rejectFriendRequest } from '../services/socialBackend';
 import { User, Comment, Achievement, AnimeEntry, AnimeWatchStatus, Anime, UserList, Friendship } from '../types';
 import Button from '../components/Button';
 import ImageCropModal from '../components/ImageCropModal';
@@ -460,10 +460,19 @@ const Profile = () => {
                             <button disabled={friendLoading} onClick={async () => { setFriendLoading(true); try { await sendFriendRequest(profileUser.id); setFriendship({ id: 'pending', requesterId: currentUser.id, addresseeId: profileUser.id, status: 'pending', createdAt: new Date().toISOString() }); } catch(e:any) { alert(e.message); } finally { setFriendLoading(false); } }} className="flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-lg bg-amber-500/10 text-amber-400 border border-amber-500/30 hover:bg-amber-500/20 transition-colors disabled:opacity-50">
                                 <UserPlus size={13} /> Arkadaş Ekle
                             </button>
-                        ) : friendship.status === 'pending' ? (
-                            <span className="flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-lg bg-gray-800 text-gray-400 border border-gray-700">
+                        ) : friendship.status === 'pending' && friendship.requesterId === currentUser.id ? (
+                            <button onClick={async () => { if (!window.confirm('İsteği geri çekmek istiyor musun?')) return; await rejectFriendRequest(friendship.id); setFriendship(null); }} className="flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-lg bg-gray-800 text-gray-400 border border-gray-700 hover:bg-red-900/20 hover:text-red-400 hover:border-red-900/30 transition-colors">
                                 <UserCheck size={13} /> İstek Gönderildi
-                            </span>
+                            </button>
+                        ) : friendship.status === 'pending' && friendship.requesterId !== currentUser.id ? (
+                            <div className="flex items-center gap-1.5">
+                                <button onClick={async () => { await acceptFriendRequest(friendship.id); setFriendship({ ...friendship, status: 'accepted' }); }} className="flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-lg bg-green-500/10 text-green-400 border border-green-500/30 hover:bg-green-500/20 transition-colors">
+                                    <UserCheck size={13} /> Kabul Et
+                                </button>
+                                <button onClick={async () => { await rejectFriendRequest(friendship.id); setFriendship(null); }} className="flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-lg bg-red-900/20 text-red-400 border border-red-900/30 hover:bg-red-900/30 transition-colors">
+                                    <X size={13} /> Reddet
+                                </button>
+                            </div>
                         ) : friendship.status === 'accepted' ? (
                             <button onClick={async () => { await removeFriend(friendship.id); setFriendship(null); }} className="flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-lg bg-green-500/10 text-green-400 border border-green-500/30 hover:bg-red-900/20 hover:text-red-400 hover:border-red-900/30 transition-colors">
                                 <UserCheck size={13} /> Arkadaş
