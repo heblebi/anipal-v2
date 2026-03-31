@@ -332,6 +332,15 @@ export const markNotificationsAsRead = async (userId: string) => {
     } catch { /* ignore */ }
 };
 
+export const clearNotifications = async (userId: string) => {
+    await supabase.from('user_notifications').delete().eq('user_id', userId);
+    try {
+        const profile = await fetchProfile(userId);
+        profile.notifications = [];
+        await saveProfile(profile);
+    } catch { /* ignore */ }
+};
+
 // ─── Leaderboard ──────────────────────────────────────────────────────────────
 
 export const getLeaderboard = async (): Promise<User[]> => {

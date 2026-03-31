@@ -6,7 +6,7 @@ import { UserRole, Notification } from '../types';
 import { LogOut, Menu, X, Settings, User as UserIcon, Search, Bell, ChevronDown, Send, MessageCircle, Users, UserCheck, UserPlus, Check } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useSiteSettings } from '../context/SiteSettingsContext';
-import { getNotifications, markNotificationsAsRead } from '../services/mockBackend';
+import { getNotifications, markNotificationsAsRead, clearNotifications } from '../services/mockBackend';
 import { getConversations, getTotalUnreadMessages, getFriends, getPendingRequests, acceptFriendRequest, rejectFriendRequest, searchUsers, sendFriendRequest } from '../services/socialBackend';
 import ChatModal from './ChatModal';
 import type { Conversation, Friendship } from '../types';
@@ -215,7 +215,22 @@ const Layout = ({ children }: { children?: React.ReactNode }) => {
                        {/* Dropdown */}
                        {showNotifs && (
                            <div className="absolute right-0 mt-2 w-[calc(100vw-2rem)] max-w-sm bg-[#18181b] border border-gray-800 rounded-xl shadow-2xl overflow-hidden animate-in fade-in slide-in-from-top-2">
-                               <div className="p-3 border-b border-gray-800 font-bold text-sm text-gray-300">Bildirimler</div>
+                               <div className="p-3 border-b border-gray-800 flex items-center justify-between">
+                                   <span className="font-bold text-sm text-gray-300">Bildirimler</span>
+                                   {notifications.length > 0 && (
+                                       <button
+                                           onClick={async () => {
+                                               if (!user) return;
+                                               await clearNotifications(user.id);
+                                               setNotifications([]);
+                                               setUnreadCount(0);
+                                           }}
+                                           className="text-[11px] text-gray-500 hover:text-red-400 transition-colors font-medium"
+                                       >
+                                           Tümünü Temizle
+                                       </button>
+                                   )}
+                               </div>
                                <div className="max-h-72 overflow-y-auto custom-scrollbar">
                                    {notifications.length > 0 ? (
                                        notifications.map(notif => {
