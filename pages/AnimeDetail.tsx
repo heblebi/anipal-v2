@@ -1,11 +1,12 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate, useSearchParams, Link } from 'react-router-dom';
-import { getAnimeById, toggleLikeEpisode, toggleWatchlist, markEpisodeWatched, unmarkEpisodeWatched, saveAnimeEntry, getAnimeEntry, grantWatchXP } from '../services/mockBackend';
+import { getAnimeById, toggleLikeEpisode, toggleWatchlist, markEpisodeWatched, unmarkEpisodeWatched, saveAnimeEntry, getAnimeEntry, grantWatchXP, getUserLists, createUserList, addAnimeToList, removeAnimeFromList, updateListVisibility, deleteUserList } from '../services/mockBackend';
 import { useAuth } from '../context/AuthContext';
 import { Anime, Episode, VideoSource, FansubGroup, AnimeWatchStatus } from '../types';
 import VideoPlayer from '../components/VideoPlayer';
 import CommentSection from '../components/CommentSection';
-import { PlayCircle, List, Heart, MessageSquare, Plus, Check, Star, CheckCircle2, X, ChevronLeft, ChevronRight } from 'lucide-react';
+import { PlayCircle, List, Heart, MessageSquare, Plus, Check, Star, CheckCircle2, X, ChevronLeft, ChevronRight, Globe, Lock, Trash2 } from 'lucide-react';
+import { UserList } from '../types';
 import Button from '../components/Button';
 
 const AnimeDetail = () => {
@@ -29,6 +30,12 @@ const AnimeDetail = () => {
   const [animeEntry, setAnimeEntry] = useState<{status: string; rating: number; review: string} | null>(null);
   const [showRatingModal, setShowRatingModal] = useState(false);
   const [ratingForm, setRatingForm] = useState({ status: AnimeWatchStatus.WATCHING, rating: 0, review: '' });
+
+  // List States
+  const [userLists, setUserLists] = useState<UserList[]>([]);
+  const [showListModal, setShowListModal] = useState(false);
+  const [newListName, setNewListName] = useState('');
+  const [creatingList, setCreatingList] = useState(false);
 
   // Watch Timer States
   const [playerStarted, setPlayerStarted] = useState(false);
@@ -67,6 +74,11 @@ const AnimeDetail = () => {
        }
     }
   }, [user, anime, selectedEpisode]);
+
+  // Load lists
+  useEffect(() => {
+    if (user) getUserLists(user.id).then(setUserLists);
+  }, [user]);
 
   // Load anime entry
   useEffect(() => {
@@ -113,6 +125,43 @@ const AnimeDetail = () => {
     }, 1000);
     return () => clearInterval(interval);
   }, [playerStarted, selectedEpisode?.id]);
+
+  const handleToggleAnimeInList = async (listId: string, animeId: string) => {
+    if (!user) return navigate('/login');
+    const list = userLists.find(l => l.id === listId);
+    if (!list) return;
+    if (list.animeIds.includes(animeId)) {
+      await removeAnimeFromList(user.id, listId, animeId);
+    } else {
+      await addAnimeToList(user.id, listId, animeId);
+    }
+    getUserLists(user.id).then(setUserLists);
+  };
+
+  const handleCreateList = async () => {
+    if (!user || !newListName.trim()) return;
+    setCreatingList(true);
+    await createUserList(user.id, newListName.trim(), true);
+    setNewListName('');
+    getUserLists(user.id).then(setUserLists);
+    setCreatingList(false);
+  };
+
+  const handleDeleteList = async (listId: string) => {
+    if (!user) return;
+    const list = userLists.find(l => l.id === listId);
+    if (!list || list.id.includes('default')) return;
+    await deleteUserList(user.id, listId);
+    getUserLists(user.id).then(setUserLists);
+  };
+
+  const handleToggleListVisibility = async (listId: string, current: boolean) => {
+    if (!user) return;
+    await updateListVisibility(user.id, listId, !current);
+    getUserLists(user.id).then(setUserLists);
+  };
+
+  const isInAnyList = anime ? userLists.some(l => l.animeIds.includes(anime.id)) : false;
 
   const handleWatchlist = async () => {
       if (!isAuthenticated || !user || !anime) return navigate('/login');
@@ -307,6 +356,16 @@ const AnimeDetail = () => {
                                 <span className="sm:hidden">{isWatched ? '✓' : 'İzlendi'}</span>
                             </Button>
 
+                            <Button
+                                variant="secondary"
+                                onClick={() => isAuthenticated ? setShowListModal(true) : navigate('/login')}
+                                className={`flex items-center gap-1.5 text-sm px-3 py-2 h-auto ${isInAnyList ? 'text-amber-400 border-amber-900 bg-amber-900/10' : ''}`}
+                            >
+                                <List size={16} />
+                                <span className="hidden sm:inline">Listeye Ekle</span>
+                                <span className="sm:hidden"><Plus size={14}/></span>
+                            </Button>
+
                             <Button variant="ghost" onClick={() => commentsRef.current?.scrollIntoView({behavior:'smooth'})} className="gap-1.5 text-sm px-3 py-2 h-auto">
                                 <MessageSquare size={16} />
                                 <span className="hidden sm:inline">Yorumlar</span>
@@ -388,6 +447,60 @@ const AnimeDetail = () => {
             </div>
         </div>
       </div>
+
+      {/* List Modal */}
+      {showListModal && anime && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4" onClick={e => e.target === e.currentTarget && setShowListModal(false)}>
+          <div className="bg-[#18181b] border border-gray-800 rounded-2xl w-full max-w-sm shadow-2xl overflow-hidden">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-800">
+              <h3 className="font-bold text-white">Listelerim</h3>
+              <button onClick={() => setShowListModal(false)} className="text-gray-500 hover:text-white"><X size={20} /></button>
+            </div>
+            <div className="max-h-64 overflow-y-auto">
+              {userLists.length === 0 ? (
+                <p className="p-5 text-sm text-gray-500 text-center">Henüz liste yok.</p>
+              ) : userLists.map(list => {
+                const inList = list.animeIds.includes(anime.id);
+                const isDefault = list.id.includes('default');
+                return (
+                  <div key={list.id} className="flex items-center gap-2 px-4 py-3 hover:bg-gray-800/50 border-b border-gray-800/50 group">
+                    <button onClick={() => handleToggleAnimeInList(list.id, anime.id)} className="flex-1 flex items-center gap-3 text-sm text-left font-medium">
+                      <span className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 transition-colors ${inList ? 'bg-green-600 border-green-500' : 'border-gray-600'}`}>
+                        {inList && <Check size={12} />}
+                      </span>
+                      <span className={`truncate ${inList ? 'text-green-400' : 'text-gray-200'}`}>{list.name}</span>
+                    </button>
+                    <button onClick={() => handleToggleListVisibility(list.id, list.isPublic)} className="text-gray-500 hover:text-gray-200 transition-colors min-w-[28px] flex justify-center" title={list.isPublic ? 'Herkese Açık' : 'Gizli'}>
+                      {list.isPublic ? <Globe size={15} /> : <Lock size={15} />}
+                    </button>
+                    {!isDefault && (
+                      <button onClick={() => handleDeleteList(list.id)} className="text-gray-700 hover:text-red-500 transition-colors min-w-[28px] flex justify-center">
+                        <Trash2 size={15} />
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+            <div className="p-4 border-t border-gray-800">
+              <p className="text-xs text-gray-500 font-bold uppercase mb-2">Yeni Liste Oluştur</p>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  placeholder="Liste adı..."
+                  value={newListName}
+                  onChange={e => setNewListName(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && handleCreateList()}
+                  className="flex-1 bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:border-amber-500 focus:outline-none"
+                />
+                <button onClick={handleCreateList} disabled={creatingList || !newListName.trim()} className="px-4 py-2 bg-amber-500 text-black font-bold rounded-lg text-sm hover:bg-amber-400 disabled:opacity-40 transition-colors">
+                  <Plus size={16} />
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Rating / Anime Entry Modal */}
       {showRatingModal && (
