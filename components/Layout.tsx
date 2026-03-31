@@ -78,6 +78,20 @@ const Layout = ({ children }: { children?: React.ReactNode }) => {
       return () => clearInterval(interval);
   }, [user]);
 
+  // Poll pending friend requests (for badge count)
+  useEffect(() => {
+      if (!user) return;
+      const fetchPending = async () => {
+          try {
+              const p = await getPendingRequests(user.id);
+              setPendingReqs(p);
+          } catch { /* ignore */ }
+      };
+      fetchPending();
+      const interval = setInterval(fetchPending, 30000);
+      return () => clearInterval(interval);
+  }, [user]);
+
   const loadFriends = async () => {
       if (!user) return;
       setFriendsLoading(true);
