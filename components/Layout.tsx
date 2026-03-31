@@ -453,7 +453,7 @@ const Layout = ({ children }: { children?: React.ReactNode }) => {
                     </button>
                     {/* Mobile notification dropdown */}
                     {showNotifs && (
-                      <div className="absolute right-0 mt-2 w-[calc(100vw-2rem)] max-w-sm bg-[#18181b] border border-gray-800 rounded-xl shadow-2xl overflow-hidden animate-in fade-in slide-in-from-top-2 z-50">
+                      <div className="fixed top-16 left-4 right-4 bg-[#18181b] border border-gray-800 rounded-xl shadow-2xl overflow-hidden animate-in fade-in slide-in-from-top-2 z-50">
                         <div className="p-3 border-b border-gray-800 flex items-center justify-between">
                           <span className="font-bold text-sm text-gray-300">Bildirimler</span>
                           {notifications.length > 0 && (
