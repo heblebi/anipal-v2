@@ -1247,6 +1247,13 @@ export const getMiniProfiles = async (ids: string[]): Promise<Map<string, { user
     return new Map((data || []).map((p: any) => [p.id, { username: p.username, avatar: p.avatar_url || '' }]));
 };
 
+export const getUploaderInfo = async (userId: string): Promise<{ id: string; username: string; avatar: string } | null> => {
+    if (!userId || !UUID_RE.test(userId)) return null;
+    const { data } = await supabase.from('profiles').select('id, username, avatar_url').eq('id', userId).single();
+    if (!data) return null;
+    return { id: data.id, username: data.username, avatar: data.avatar_url || '' };
+};
+
 // ─── Episode Contributions ─────────────────────────────────────────────────────
 
 export const submitContribution = async (

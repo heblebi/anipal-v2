@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate, useSearchParams, Link } from 'react-router-dom';
-import { getAnimeById, toggleLikeEpisode, toggleWatchlist, markEpisodeWatched, unmarkEpisodeWatched, saveAnimeEntry, getAnimeEntry, grantWatchXP, getUserLists, createUserList, addAnimeToList, removeAnimeFromList, updateListVisibility, deleteUserList, getMiniProfiles } from '../services/mockBackend';
+import { getAnimeById, toggleLikeEpisode, toggleWatchlist, markEpisodeWatched, unmarkEpisodeWatched, saveAnimeEntry, getAnimeEntry, grantWatchXP, getUserLists, createUserList, addAnimeToList, removeAnimeFromList, updateListVisibility, deleteUserList, getMiniProfiles, getUploaderInfo } from '../services/mockBackend';
 import { useAuth } from '../context/AuthContext';
 import { Anime, Episode, VideoSource, FansubGroup, AnimeWatchStatus } from '../types';
 import VideoPlayer from '../components/VideoPlayer';
@@ -43,6 +43,7 @@ const AnimeDetail = () => {
 
   // Mini profiles map: userId -> { username, avatar }
   const [miniProfiles, setMiniProfiles] = useState<Map<string, { username: string; avatar: string }>>(new Map());
+  const [episodeUploader, setEpisodeUploader] = useState<{ id: string; username: string; avatar: string } | null>(null);
 
   const commentsRef = useRef<HTMLDivElement>(null);
 
@@ -61,7 +62,13 @@ const AnimeDetail = () => {
             setSelectedFansubName(fansubs[0].name);
             setSelectedSource(fansubs[0].sources[0] || null);
           }
-          // Collect all user IDs to fetch profiles for
+          // Fetch uploader info for the initial episode
+          const initEp = data.episodes.length > 0
+            ? (() => { const sorted = [...data.episodes].sort((a,b) => a.number - b.number); const epId = searchParams.get('ep'); return epId ? sorted.find(e => e.id === epId) || sorted[0] : sorted[0]; })()
+            : null;
+          const uploaderUserId = initEp?.addedBy || data.uploadedBy;
+          getUploaderInfo(uploaderUserId || '').then(setEpisodeUploader).catch(() => {});
+          // Also collect all IDs for the map (used elsewhere)
           const ids: string[] = [];
           if (data.uploadedBy) ids.push(data.uploadedBy);
           data.episodes.forEach(ep => { if (ep.addedBy) ids.push(ep.addedBy); });
@@ -340,6 +347,8 @@ const AnimeDetail = () => {
                     const fansubs = getEpFansubs(ep);
                     setSelectedFansubName(fansubs[0].name);
                     setSelectedSource(fansubs[0].sources[0] || null);
+                    const uid = ep.addedBy || anime?.uploadedBy;
+                    getUploaderInfo(uid || '').then(setEpisodeUploader).catch(() => {});
                     navigate(`/anime/${id}/watch?ep=${ep.id}`, { replace: true });
                     window.scrollTo({ top: 0, behavior: 'smooth' });
                 };
@@ -380,38 +389,19 @@ const AnimeDetail = () => {
                         </div>
                     </div>
 
-                    {/* Katkıda bulunan */}
-                    {(() => {
-                      const fb = getEpFansubs(selectedEpisode).find(f => f.name === selectedFansubName);
-                      // Priority: fansub contributor > episode addedBy > anime uploadedBy
-                      let userId: string | undefined;
-                      let username: string | undefined;
-                      let avatar: string | undefined;
-                      if (fb?.contributorUsername) {
-                        userId = fb.contributorId;
-                        username = fb.contributorUsername;
-                        avatar = fb.contributorAvatar;
-                      } else {
-                        const epAddedBy = selectedEpisode.addedBy || anime?.uploadedBy;
-                        if (epAddedBy) {
-                          const p = miniProfiles.get(epAddedBy);
-                          if (p) { userId = epAddedBy; username = p.username; avatar = p.avatar; }
+                    {/* Ekleyen */}
+                    {episodeUploader && (
+                      <Link to={`/profile/${episodeUploader.id}`} className="flex items-center gap-2.5 group w-fit">
+                        {episodeUploader.avatar
+                          ? <img src={episodeUploader.avatar} className="w-8 h-8 rounded-full object-cover ring-2 ring-gray-700 group-hover:ring-amber-500 transition-all flex-shrink-0" alt="" />
+                          : <div className="w-8 h-8 rounded-full bg-gray-700 ring-2 ring-gray-600 group-hover:ring-amber-500 transition-all flex items-center justify-center flex-shrink-0"><span className="text-xs text-gray-300 font-bold">{episodeUploader.username[0].toUpperCase()}</span></div>
                         }
-                      }
-                      if (!username) return null;
-                      return (
-                        <Link to={`/profile/${userId}`} className="flex items-center gap-3 group w-fit pt-1">
-                          {avatar
-                            ? <img src={avatar} className="w-9 h-9 rounded-full object-cover ring-2 ring-gray-700 group-hover:ring-amber-500 transition-all" alt="" />
-                            : <div className="w-9 h-9 rounded-full bg-gray-700 ring-2 ring-gray-600 group-hover:ring-amber-500 transition-all flex items-center justify-center"><span className="text-sm text-gray-300 font-bold">{username[0].toUpperCase()}</span></div>
-                          }
-                          <div>
-                            <p className="text-sm font-semibold text-white group-hover:text-amber-400 transition-colors leading-tight">{username}</p>
-                            <p className="text-xs text-gray-500">Tarafından Eklendi</p>
-                          </div>
-                        </Link>
-                      );
-                    })()}
+                        <div className="min-w-0">
+                          <p className="text-sm font-semibold text-white group-hover:text-amber-400 transition-colors leading-tight truncate">{episodeUploader.username}</p>
+                          <p className="text-[11px] text-gray-500 leading-tight">Ekleyen</p>
+                        </div>
+                      </Link>
+                    )}
 
                     {/* Prev / Next Episode Buttons */}
                     <div className="flex gap-2">
