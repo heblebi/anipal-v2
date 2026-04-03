@@ -22,6 +22,7 @@ const parseVideoLink = (url: string) => {
   if (dm) return { name: 'Dailymotion', embedUrl: `https://www.dailymotion.com/embed/video/${dm[1]}`, thumbnail: '' };
   const vimeo = url.match(/vimeo\.com\/(\d+)/);
   if (vimeo) return { name: 'Vimeo', embedUrl: `https://player.vimeo.com/video/${vimeo[1]}`, thumbnail: '' };
+  if (/tau\.com\.tr|taudt|tau-video|taudtmi/i.test(url)) return { name: 'Tau', embedUrl: url, thumbnail: '' };
   return { name: 'Diğer', embedUrl: url, thumbnail: '' };
 };
 

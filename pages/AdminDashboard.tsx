@@ -1613,6 +1613,7 @@ const parseVideoLink = (url: string): { embedUrl: string; thumbnail: string; nam
   if (url.includes('mail.ru') || url.includes('mycdn.me')) return { name: 'Mail.ru', embedUrl: url, thumbnail: '' };
   if (url.includes('filemoon')) return { name: 'Filemoon', embedUrl: url, thumbnail: '' };
   if (url.includes('streamtape')) return { name: 'Streamtape', embedUrl: url, thumbnail: '' };
+  if (/tau\.com\.tr|taudt|tau-video|taudtmi/i.test(url)) return { name: 'Tau', embedUrl: url, thumbnail: '' };
   // Fembed / diğer embed linkleri — olduğu gibi kullan
   return { name: 'Fembed', embedUrl: url, thumbnail: '' };
 };
