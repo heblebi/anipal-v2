@@ -2,8 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { getAnimes, submitContribution } from '../services/mockBackend';
-import { UserRole, Anime } from '../types';
-import { Plus, Trash2, ArrowLeft, CheckCircle2, AlertCircle, Loader2, X } from 'lucide-react';
+import { UserRole, Anime, Episode } from '../types';
+import { Plus, Trash2, ArrowLeft, CheckCircle2, AlertCircle, Loader2, X, Film, Link2 } from 'lucide-react';
 
 interface SourceRow { id: string; name: string; url: string; }
 
@@ -33,13 +33,22 @@ const ContributePage = () => {
   const [animes, setAnimes] = useState<Anime[]>([]);
   const [animesLoading, setAnimesLoading] = useState(true);
 
+  // Mode: 'episode' = new episode, 'source' = add source to existing episode
+  const [mode, setMode] = useState<'episode' | 'source'>('episode');
+
   // Form state
   const [selectedAnimeId, setSelectedAnimeId] = useState(paramAnimeId || '');
   const [animeSearch, setAnimeSearch] = useState('');
   const [showAnimeDropdown, setShowAnimeDropdown] = useState(false);
+
+  // Episode mode fields
   const [episodeNumber, setEpisodeNumber] = useState('');
   const [episodeTitle, setEpisodeTitle] = useState('');
   const [thumbnail, setThumbnail] = useState('');
+
+  // Source mode: pick existing episode
+  const [targetEpisodeId, setTargetEpisodeId] = useState('');
+
   const [fansubName, setFansubName] = useState('');
   const [sources, setSources] = useState<SourceRow[]>([newSource()]);
 
@@ -74,6 +83,8 @@ const ContributePage = () => {
   };
 
   const selectedAnime = animes.find(a => a.id === selectedAnimeId);
+  const sortedEpisodes = (selectedAnime?.episodes || []).slice().sort((a, b) => a.number - b.number);
+  const targetEpisode = sortedEpisodes.find(e => e.id === targetEpisodeId);
 
   const filteredAnimes = animes.filter(a =>
     a.title.toLowerCase().includes(animeSearch.toLowerCase())
@@ -94,6 +105,15 @@ const ContributePage = () => {
     if (parsed.thumbnail && !thumbnail) setThumbnail(parsed.thumbnail);
   };
 
+  const handleModeChange = (newMode: 'episode' | 'source') => {
+    setMode(newMode);
+    setTargetEpisodeId('');
+    setEpisodeNumber('');
+    setEpisodeTitle('');
+    setThumbnail('');
+    setMsg(null);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
@@ -102,21 +122,32 @@ const ContributePage = () => {
     const validSources = sources.filter(s => s.url.trim());
     if (validSources.length === 0) { setMsg({ type: 'error', text: 'En az bir kaynak URL gereklidir.' }); return; }
 
+    if (mode === 'source') {
+      if (!targetEpisodeId) { setMsg({ type: 'error', text: 'Lütfen bir bölüm seçin.' }); return; }
+      if (!targetEpisode) { setMsg({ type: 'error', text: 'Seçilen bölüm bulunamadı.' }); return; }
+    } else {
+      if (!episodeNumber) { setMsg({ type: 'error', text: 'Bölüm numarası gereklidir.' }); return; }
+      if (!episodeTitle.trim()) { setMsg({ type: 'error', text: 'Bölüm başlığı gereklidir.' }); return; }
+    }
+
     setLoading(true);
     setMsg(null);
     try {
       await submitContribution(user.id, {
         animeId: selectedAnimeId,
-        episodeNumber: parseInt(episodeNumber),
-        episodeTitle: episodeTitle.trim(),
-        thumbnail: thumbnail.trim() || undefined,
+        episodeNumber: mode === 'source' ? targetEpisode!.number : parseInt(episodeNumber),
+        episodeTitle: mode === 'source' ? targetEpisode!.title : episodeTitle.trim(),
+        thumbnail: mode === 'source' ? targetEpisode!.thumbnail : (thumbnail.trim() || undefined),
         fansubName: fansubName.trim(),
         sources: validSources.map(s => ({ name: s.name, url: s.url })),
+        type: mode,
+        targetEpisodeId: mode === 'source' ? targetEpisodeId : undefined,
       });
       setMsg({ type: 'success', text: 'Katkınız başarıyla gönderildi! Admin onayından sonra yayınlanacak.' });
       setEpisodeNumber('');
       setEpisodeTitle('');
       setThumbnail('');
+      setTargetEpisodeId('');
       setFansubName('');
       setSources([newSource()]);
     } catch (err: any) {
@@ -143,9 +174,27 @@ const ContributePage = () => {
             <ArrowLeft size={20} />
           </button>
           <div>
-            <h1 className="text-xl font-black text-white">Bölüm Katkısı Gönder</h1>
+            <h1 className="text-xl font-black text-white">Katkı Gönder</h1>
             <p className="text-xs text-gray-500 mt-0.5">Katkılarınız admin onayından sonra yayınlanır</p>
           </div>
+        </div>
+
+        {/* Mode Toggle */}
+        <div className="flex gap-2 p-1 bg-[#18181b] border border-gray-800 rounded-xl">
+          <button
+            type="button"
+            onClick={() => handleModeChange('episode')}
+            className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-bold transition-colors ${mode === 'episode' ? 'bg-amber-500 text-black' : 'text-gray-400 hover:text-white'}`}
+          >
+            <Film size={15} /> Yeni Bölüm Ekle
+          </button>
+          <button
+            type="button"
+            onClick={() => handleModeChange('source')}
+            className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-bold transition-colors ${mode === 'source' ? 'bg-amber-500 text-black' : 'text-gray-400 hover:text-white'}`}
+          >
+            <Link2 size={15} /> Var Olan Bölüme Kaynak Ekle
+          </button>
         </div>
 
         {msg && (
@@ -164,7 +213,7 @@ const ContributePage = () => {
                 type="text"
                 placeholder="Anime adı ara..."
                 value={animeSearch}
-                onChange={e => { setAnimeSearch(e.target.value); setShowAnimeDropdown(true); if (!e.target.value) setSelectedAnimeId(''); }}
+                onChange={e => { setAnimeSearch(e.target.value); setShowAnimeDropdown(true); if (!e.target.value) { setSelectedAnimeId(''); setTargetEpisodeId(''); } }}
                 onFocus={() => setShowAnimeDropdown(true)}
                 onBlur={() => setTimeout(() => setShowAnimeDropdown(false), 150)}
                 className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2.5 text-white text-sm focus:border-amber-500 focus:outline-none"
@@ -175,7 +224,7 @@ const ContributePage = () => {
                     <button
                       key={a.id}
                       type="button"
-                      onMouseDown={() => { setSelectedAnimeId(a.id); setAnimeSearch(a.title); setShowAnimeDropdown(false); }}
+                      onMouseDown={() => { setSelectedAnimeId(a.id); setAnimeSearch(a.title); setShowAnimeDropdown(false); setTargetEpisodeId(''); }}
                       className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-gray-800 transition-colors text-left"
                     >
                       <img src={a.coverImage} className="w-7 h-10 object-cover rounded flex-shrink-0" alt="" onError={e => (e.target as HTMLImageElement).style.display = 'none'} />
@@ -190,53 +239,87 @@ const ContributePage = () => {
                 <img src={selectedAnime.coverImage} className="w-10 h-14 object-cover rounded flex-shrink-0" alt="" onError={e => (e.target as HTMLImageElement).style.display = 'none'} />
                 <div className="min-w-0">
                   <p className="text-white font-bold text-sm truncate">{selectedAnime.title}</p>
-                  <p className="text-xs text-gray-500">{(selectedAnime.episodes || []).length} mevcut bölüm</p>
+                  <p className="text-xs text-gray-500">{sortedEpisodes.length} mevcut bölüm</p>
                 </div>
               </div>
             )}
           </div>
 
-          {/* Bölüm Bilgileri */}
-          <div className="bg-[#18181b] border border-gray-800 rounded-xl p-4 space-y-3">
-            <h2 className="text-sm font-bold text-amber-500 uppercase">Bölüm Bilgileri</h2>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <label className="text-xs text-gray-400">Bölüm No *</label>
-                <input
-                  type="number"
-                  required
-                  min="1"
-                  value={episodeNumber}
-                  onChange={e => setEpisodeNumber(e.target.value)}
-                  className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:border-amber-500 focus:outline-none"
-                />
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs text-gray-400">Bölüm Başlığı *</label>
-                <input
-                  type="text"
-                  required
-                  value={episodeTitle}
-                  onChange={e => setEpisodeTitle(e.target.value)}
-                  placeholder="örn: Yeni Başlangıç"
-                  className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:border-amber-500 focus:outline-none"
-                />
-              </div>
-            </div>
-            <div className="space-y-1">
-              <label className="text-xs text-gray-400">Kapak URL (isteğe bağlı)</label>
-              <input
-                type="url"
-                value={thumbnail}
-                onChange={e => setThumbnail(e.target.value)}
-                placeholder="https://..."
-                className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:border-amber-500 focus:outline-none"
-              />
-              {thumbnail && (
-                <img src={thumbnail} className="w-full h-24 object-cover rounded-lg border border-gray-700 mt-1" onError={e => (e.target as HTMLImageElement).style.display = 'none'} />
+          {/* Source Mode: Episode Picker */}
+          {mode === 'source' && selectedAnime && (
+            <div className="bg-[#18181b] border border-gray-800 rounded-xl p-4 space-y-3">
+              <h2 className="text-sm font-bold text-amber-500 uppercase">Bölüm Seç</h2>
+              {sortedEpisodes.length === 0 ? (
+                <p className="text-gray-500 text-sm">Bu animenin henüz bölümü yok.</p>
+              ) : (
+                <select
+                  value={targetEpisodeId}
+                  onChange={e => setTargetEpisodeId(e.target.value)}
+                  className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2.5 text-white text-sm focus:border-amber-500 focus:outline-none"
+                >
+                  <option value="">-- Bölüm seçin --</option>
+                  {sortedEpisodes.map(ep => (
+                    <option key={ep.id} value={ep.id}>Bölüm {ep.number}: {ep.title}</option>
+                  ))}
+                </select>
+              )}
+              {targetEpisode && (
+                <div className="flex items-center gap-3 p-3 bg-gray-900 rounded-lg border border-gray-800">
+                  {targetEpisode.thumbnail && (
+                    <img src={targetEpisode.thumbnail} className="w-16 h-10 object-cover rounded flex-shrink-0" alt="" onError={e => (e.target as HTMLImageElement).style.display = 'none'} />
+                  )}
+                  <div className="min-w-0">
+                    <p className="text-white font-bold text-sm">Bölüm {targetEpisode.number}: {targetEpisode.title}</p>
+                    <p className="text-xs text-gray-500">{(targetEpisode.fansubs || []).length} mevcut fansub grubu</p>
+                  </div>
+                </div>
               )}
             </div>
-          </div>
+          )}
+
+          {/* Episode Mode: Bölüm Bilgileri */}
+          {mode === 'episode' && (
+            <div className="bg-[#18181b] border border-gray-800 rounded-xl p-4 space-y-3">
+              <h2 className="text-sm font-bold text-amber-500 uppercase">Bölüm Bilgileri</h2>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-xs text-gray-400">Bölüm No *</label>
+                  <input
+                    type="number"
+                    required={mode === 'episode'}
+                    min="1"
+                    value={episodeNumber}
+                    onChange={e => setEpisodeNumber(e.target.value)}
+                    className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:border-amber-500 focus:outline-none"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs text-gray-400">Bölüm Başlığı *</label>
+                  <input
+                    type="text"
+                    required={mode === 'episode'}
+                    value={episodeTitle}
+                    onChange={e => setEpisodeTitle(e.target.value)}
+                    placeholder="örn: Yeni Başlangıç"
+                    className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:border-amber-500 focus:outline-none"
+                  />
+                </div>
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs text-gray-400">Kapak URL (isteğe bağlı)</label>
+                <input
+                  type="url"
+                  value={thumbnail}
+                  onChange={e => setThumbnail(e.target.value)}
+                  placeholder="https://..."
+                  className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:border-amber-500 focus:outline-none"
+                />
+                {thumbnail && (
+                  <img src={thumbnail} className="w-full h-24 object-cover rounded-lg border border-gray-700 mt-1" onError={e => (e.target as HTMLImageElement).style.display = 'none'} />
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Fansub & Kaynaklar */}
           <div className="bg-[#18181b] border border-gray-800 rounded-xl p-4 space-y-3">
@@ -313,8 +396,11 @@ const ContributePage = () => {
         {/* Info */}
         <div className="bg-blue-900/10 border border-blue-900/30 rounded-xl p-4 text-xs text-blue-300 space-y-1">
           <p className="font-bold text-blue-200">Nasıl çalışır?</p>
-          <p>Gönderdiğiniz katkılar admin onayına girer. Onaylandıktan sonra ilgili animenin bölüm listesine eklenir.</p>
-          <p>Katkılarınızı <button onClick={() => navigate('/my-contributions')} className="underline text-amber-400 hover:text-amber-300">Katkılarım</button> sayfasından takip edebilirsiniz.</p>
+          {mode === 'episode'
+            ? <p>Gönderdiğiniz yeni bölümler admin onayına girer. Onaylandıktan sonra animenin bölüm listesine eklenir.</p>
+            : <p>Mevcut bir bölüme yeni fansub/kaynak ekleyebilirsiniz. Admin onaylandıktan sonra izleme sayfasında görünür.</p>
+          }
+          <p>Katkılarınızı Panel &gt; Animelerim sekmesinden takip edebilirsiniz.</p>
         </div>
       </div>
     </div>

@@ -17,7 +17,7 @@ interface EmbedResult {
   error?: string;
   url?: string;
 }
-import { Activity, Download, Users, CheckCircle, ShieldAlert, PlaySquare, Search, Shield, Plus, Trash2, Image, ChevronDown, ChevronRight, Pencil, X, Save, Globe, Loader2, CheckCircle2, AlertCircle, ImageIcon, Upload, Send, UserX, Flag, MessageSquare } from 'lucide-react';
+import { Activity, Download, Users, CheckCircle, ShieldAlert, PlaySquare, Search, Shield, Plus, Trash2, Image, ChevronDown, ChevronRight, Pencil, X, Save, Globe, Loader2, CheckCircle2, AlertCircle, ImageIcon, Upload, Send, UserX, Flag, MessageSquare, Film, Link2 } from 'lucide-react';
 import ImageCropModal from '../components/ImageCropModal';
 import { SITE_ASSETS, SiteAsset } from '../services/siteSettings';
 import { useSiteSettings } from '../context/SiteSettingsContext';
@@ -36,7 +36,8 @@ const AdminDashboard = () => {
   const navigate = useNavigate();
   const isEditor = user?.role === UserRole.EDITOR;
   const [activeTab, setActiveTab] = useState<'stats' | 'manage' | 'news' | 'moderation' | 'users' | 'assets' | 'community'>(isEditor ? 'news' : 'stats');
-  const [communityTab, setCommunityTab] = useState<'requests' | 'reports' | 'contributions'>('requests');
+  const [communityTab, setCommunityTab] = useState<'requests' | 'reports'>('requests');
+  const [moderationTab, setModerationTab] = useState<'animes' | 'episodes' | 'sources' | 'news'>('animes');
   const { settings: siteSettings, uploadAndSave } = useSiteSettings();
   const [assetCrop, setAssetCrop] = useState<{ src: string; asset: SiteAsset } | null>(null);
   const [assetSaving, setAssetSaving] = useState<string | null>(null);
@@ -47,7 +48,7 @@ const AdminDashboard = () => {
   const [reportsLoading, setReportsLoading] = useState(false);
   const [contributions, setContributions] = useState<EpisodeContribution[]>([]);
   const [contributionsLoading, setContributionsLoading] = useState(false);
-  const [contributionSearch, setContributionSearch] = useState('');
+
   const [requestSearch, setRequestSearch] = useState('');
   const [reportSearch, setReportSearch] = useState('');
   const [rejectNote, setRejectNote] = useState('');
@@ -476,9 +477,9 @@ const AdminDashboard = () => {
           )}
           {!isModerator && !isEditor && (
              <>
-                <TabButton active={activeTab==='moderation'} onClick={()=>setActiveTab('moderation')} icon={<CheckCircle size={18}/>}>Onay Bekleyenler</TabButton>
+                <TabButton active={activeTab==='moderation'} onClick={()=>{ setActiveTab('moderation'); loadContributions(); }} icon={<CheckCircle size={18}/>}>Onay Bekleyenler</TabButton>
                 <TabButton active={activeTab==='users'} onClick={()=>setActiveTab('users')} icon={<Users size={18}/>}>Kullanıcılar</TabButton>
-                <TabButton active={activeTab==='community'} onClick={()=>{ setActiveTab('community'); loadRequests(); loadReports(); loadContributions(); }} icon={<Flag size={18}/>}>İstek & Şikayetler</TabButton>
+                <TabButton active={activeTab==='community'} onClick={()=>{ setActiveTab('community'); loadRequests(); loadReports(); }} icon={<Flag size={18}/>}>İstek & Şikayetler</TabButton>
                 <TabButton active={activeTab==='assets'} onClick={()=>setActiveTab('assets')} icon={<ImageIcon size={18}/>}>Site Görselleri</TabButton>
              </>
           )}
@@ -756,53 +757,183 @@ const AdminDashboard = () => {
       )}
 
       {activeTab === 'moderation' && (
-          <div className="space-y-6">
-              {/* Pending Animes */}
-              <div className="space-y-3">
-                <h3 className="text-lg font-bold text-white flex items-center gap-2"><CheckCircle size={18} className="text-amber-500"/> Onay Bekleyen Animeler</h3>
-                {animes.filter(a => a.status === AnimeStatus.PENDING).length === 0 ? (
-                    <p className="text-gray-500 text-sm">Bekleyen anime yok.</p>
-                ) : (
-                    animes.filter(a => a.status === AnimeStatus.PENDING).map(anime => (
-                        <div key={anime.id} className="bg-gray-900 p-4 rounded-xl flex items-center justify-between border border-gray-800">
-                            <div className="flex items-center gap-4">
-                                <img src={anime.coverImage} className="w-12 h-16 object-cover rounded" />
-                                <div>
-                                    <div className="font-bold text-white">{anime.title}</div>
-                                    <div className="text-xs text-gray-500">Yükleyen: {anime.uploadedBy}</div>
-                                </div>
-                            </div>
-                            <div className="flex gap-2">
-                                <Button size="sm" onClick={() => handleApprove(anime.id)}>Onayla</Button>
-                                <Button size="sm" variant="danger">Reddet</Button>
-                            </div>
-                        </div>
-                    ))
-                )}
-              </div>
+          <div className="space-y-4">
+            {/* Moderation inner tabs */}
+            <div className="flex gap-2 border-b border-gray-800 pb-1 flex-wrap">
+              <button onClick={() => setModerationTab('animes')} className={`flex items-center gap-2 px-4 py-2.5 text-sm font-bold transition-colors border-b-2 -mb-px ${moderationTab === 'animes' ? 'text-amber-500 border-amber-500' : 'text-gray-400 border-transparent hover:text-white'}`}>
+                <PlaySquare size={15}/> Anime Onayları <span className="bg-gray-800 text-gray-400 text-[10px] px-1.5 py-0.5 rounded-full">{animes.filter(a => a.status === AnimeStatus.PENDING).length}</span>
+              </button>
+              <button onClick={() => setModerationTab('episodes')} className={`flex items-center gap-2 px-4 py-2.5 text-sm font-bold transition-colors border-b-2 -mb-px ${moderationTab === 'episodes' ? 'text-amber-500 border-amber-500' : 'text-gray-400 border-transparent hover:text-white'}`}>
+                <Film size={15}/> Bölüm Onayları <span className="bg-gray-800 text-gray-400 text-[10px] px-1.5 py-0.5 rounded-full">{contributions.filter(c => (c.type || 'episode') === 'episode' && (c.status === 'pending' || c.pendingAction)).length}</span>
+              </button>
+              <button onClick={() => setModerationTab('sources')} className={`flex items-center gap-2 px-4 py-2.5 text-sm font-bold transition-colors border-b-2 -mb-px ${moderationTab === 'sources' ? 'text-amber-500 border-amber-500' : 'text-gray-400 border-transparent hover:text-white'}`}>
+                <Link2 size={15}/> Kaynak Onayları <span className="bg-gray-800 text-gray-400 text-[10px] px-1.5 py-0.5 rounded-full">{contributions.filter(c => c.type === 'source' && (c.status === 'pending' || c.pendingAction)).length}</span>
+              </button>
+              <button onClick={() => setModerationTab('news')} className={`flex items-center gap-2 px-4 py-2.5 text-sm font-bold transition-colors border-b-2 -mb-px ${moderationTab === 'news' ? 'text-amber-500 border-amber-500' : 'text-gray-400 border-transparent hover:text-white'}`}>
+                <Activity size={15}/> Haber Onayları <span className="bg-gray-800 text-gray-400 text-[10px] px-1.5 py-0.5 rounded-full">{newsList.filter(n => n.status === 'pending').length}</span>
+              </button>
+            </div>
 
-              {/* Pending News */}
+            {/* Anime Onayları */}
+            {moderationTab === 'animes' && (
               <div className="space-y-3">
-                <h3 className="text-lg font-bold text-white flex items-center gap-2"><Activity size={18} className="text-blue-400"/> Onay Bekleyen Haberler</h3>
-                {newsList.filter(n => n.status === 'pending').length === 0 ? (
-                    <p className="text-gray-500 text-sm">Bekleyen haber yok.</p>
+                {animes.filter(a => a.status === AnimeStatus.PENDING).length === 0 ? (
+                  <p className="text-gray-500 text-sm text-center py-10">Bekleyen anime yok.</p>
                 ) : (
-                    newsList.filter(n => n.status === 'pending').map(item => (
-                        <div key={item.id} className="bg-gray-900 p-4 rounded-xl flex items-start gap-4 border border-gray-800">
-                            {item.image && <img src={item.image} className="w-20 h-14 object-cover rounded flex-shrink-0" onError={e => (e.target as HTMLImageElement).style.display='none'} />}
-                            <div className="flex-1 min-w-0">
-                                <div className="font-bold text-white text-sm truncate">{item.title}</div>
-                                <div className="text-xs text-gray-400 mt-0.5 line-clamp-2">{item.excerpt}</div>
-                                <div className="text-xs text-gray-600 mt-1">{item.category} · {new Date(item.createdAt).toLocaleDateString('tr-TR')}</div>
-                            </div>
-                            <div className="flex gap-2 flex-shrink-0">
-                                <Button size="sm" onClick={() => handleApproveNews(item.id)}>Onayla</Button>
-                                <Button size="sm" variant="danger" onClick={() => handleDeleteNews(item.id, item.title)}>Reddet</Button>
-                            </div>
+                  animes.filter(a => a.status === AnimeStatus.PENDING).map(anime => (
+                    <div key={anime.id} className="bg-gray-900 p-4 rounded-xl flex items-center justify-between border border-gray-800">
+                      <div className="flex items-center gap-4">
+                        <img src={anime.coverImage} className="w-12 h-16 object-cover rounded" />
+                        <div>
+                          <div className="font-bold text-white">{anime.title}</div>
+                          <div className="text-xs text-gray-500">Yükleyen: {anime.uploadedBy}</div>
                         </div>
-                    ))
+                      </div>
+                      <div className="flex gap-2">
+                        <Button size="sm" onClick={() => handleApprove(anime.id)}>Onayla</Button>
+                        <Button size="sm" variant="danger">Reddet</Button>
+                      </div>
+                    </div>
+                  ))
                 )}
               </div>
+            )}
+
+            {/* Bölüm Onayları & Kaynak Onayları (shared contribution card UI) */}
+            {(moderationTab === 'episodes' || moderationTab === 'sources') && (() => {
+              const typeFilter = moderationTab === 'episodes' ? 'episode' : 'source';
+              const filtered = contributions.filter(c => (c.type || 'episode') === typeFilter);
+              const sorted = [
+                ...filtered.filter(c => c.pendingAction),
+                ...filtered.filter(c => !c.pendingAction && c.status === 'pending'),
+                ...filtered.filter(c => !c.pendingAction && c.status === 'approved'),
+                ...filtered.filter(c => !c.pendingAction && c.status === 'rejected'),
+              ];
+              if (contributionsLoading) return <div className="text-gray-500 text-sm text-center py-10">Yükleniyor...</div>;
+              if (sorted.length === 0) return <div className="text-center py-12 text-gray-600 text-sm">Bekleyen onay yok.</div>;
+              return (
+                <div className="space-y-3">
+                  {sorted.map(c => (
+                    <div key={c.id} className="bg-[#18181b] border border-gray-800 rounded-xl p-4 space-y-3">
+                      <div className="flex items-start justify-between gap-3 flex-wrap">
+                        <div className="space-y-1 min-w-0 flex-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            {c.type === 'source' && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full border bg-purple-500/10 text-purple-400 border-purple-500/30">Kaynak Katkısı</span>}
+                            {c.pendingAction === 'edit' && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full border bg-blue-500/10 text-blue-400 border-blue-500/30">Düzenleme İsteği</span>}
+                            {c.pendingAction === 'delete' && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full border bg-red-500/10 text-red-400 border-red-500/30">Silme İsteği</span>}
+                            {!c.pendingAction && c.status === 'pending' && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full border bg-amber-500/10 text-amber-400 border-amber-500/30">Onay Bekliyor</span>}
+                            {!c.pendingAction && c.status === 'approved' && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full border bg-green-500/10 text-green-400 border-green-500/30">Onaylandı</span>}
+                            {!c.pendingAction && c.status === 'rejected' && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full border bg-red-500/10 text-red-400 border-red-500/30">Reddedildi</span>}
+                          </div>
+                          <p className="text-xs text-gray-400">
+                            <span className="text-gray-500">Gönderen:</span> <span className="text-white font-bold">{c.submitterUsername || c.submittedBy.slice(0, 8)}</span>
+                          </p>
+                          <p className="text-sm text-white font-medium">
+                            Bölüm {c.episodeNumber}: {c.episodeTitle}
+                          </p>
+                          <p className="text-xs text-gray-500">
+                            <span className="text-gray-600">Anime:</span> {c.animeId} &nbsp;·&nbsp;
+                            <span className="text-amber-400 font-medium">{c.fansubName}</span> &nbsp;·&nbsp;
+                            {c.sources?.length || 0} kaynak
+                          </p>
+                          {c.pendingAction === 'edit' && c.pendingData && (
+                            <div className="text-xs text-blue-300 bg-blue-900/10 border border-blue-900/30 rounded-lg p-2 mt-1 space-y-0.5">
+                              <p className="font-bold">İstenen Değişiklikler:</p>
+                              {c.pendingData.fansubName && <p>Fansub: <span className="text-white">{c.pendingData.fansubName}</span></p>}
+                              {c.pendingData.episodeTitle && <p>Başlık: <span className="text-white">{c.pendingData.episodeTitle}</span></p>}
+                              {c.pendingData.sources && <p>Kaynaklar: <span className="text-white">{c.pendingData.sources.length} kaynak</span></p>}
+                            </div>
+                          )}
+                        </div>
+                        <p className="text-[10px] text-gray-600 flex-shrink-0">{new Date(c.createdAt).toLocaleDateString('tr-TR')}</p>
+                      </div>
+
+                      {rejectTarget === c.id && (
+                        <div className="flex gap-2 items-center">
+                          <input
+                            type="text"
+                            placeholder="Admin notu (isteğe bağlı)..."
+                            value={rejectNote}
+                            onChange={e => setRejectNote(e.target.value)}
+                            className="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-3 py-1.5 text-white text-xs focus:border-red-500 focus:outline-none"
+                            autoFocus
+                          />
+                          <button
+                            onClick={async () => {
+                              try {
+                                if (c.pendingAction) await rejectContributionAction(c.id);
+                                else await rejectContribution(c.id, rejectNote || undefined);
+                                setRejectTarget(null); setRejectNote(''); loadContributions();
+                              } catch (e: any) { alert(e.message); }
+                            }}
+                            className="text-xs font-bold px-3 py-1.5 rounded-lg bg-red-500 text-white hover:bg-red-600 transition-colors flex-shrink-0"
+                          >
+                            Reddet
+                          </button>
+                          <button onClick={() => { setRejectTarget(null); setRejectNote(''); }} className="text-xs text-gray-400 hover:text-white p-1"><X size={14}/></button>
+                        </div>
+                      )}
+
+                      <div className="flex gap-2 flex-wrap">
+                        {c.pendingAction ? (
+                          <>
+                            <button
+                              onClick={async () => { try { await approveContributionAction(c.id); loadContributions(); } catch (e: any) { alert(e.message); } }}
+                              className="text-xs font-bold px-3 py-1.5 rounded-lg bg-green-500/10 text-green-400 border border-green-500/30 hover:bg-green-500/20 transition-colors"
+                            >
+                              Değişikliği Onayla
+                            </button>
+                            {rejectTarget !== c.id && (
+                              <button onClick={() => { setRejectTarget(c.id); setRejectNote(''); }} className="text-xs font-bold px-3 py-1.5 rounded-lg bg-red-500/10 text-red-400 border border-red-500/30 hover:bg-red-500/20 transition-colors">
+                                Reddet
+                              </button>
+                            )}
+                          </>
+                        ) : c.status === 'pending' ? (
+                          <>
+                            <button
+                              onClick={async () => { try { await approveContribution(c.id); loadContributions(); } catch (e: any) { alert(e.message); } }}
+                              className="text-xs font-bold px-3 py-1.5 rounded-lg bg-green-500/10 text-green-400 border border-green-500/30 hover:bg-green-500/20 transition-colors"
+                            >
+                              Onayla
+                            </button>
+                            {rejectTarget !== c.id && (
+                              <button onClick={() => { setRejectTarget(c.id); setRejectNote(''); }} className="text-xs font-bold px-3 py-1.5 rounded-lg bg-red-500/10 text-red-400 border border-red-500/30 hover:bg-red-500/20 transition-colors">
+                                Reddet
+                              </button>
+                            )}
+                          </>
+                        ) : null}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              );
+            })()}
+
+            {/* Haber Onayları */}
+            {moderationTab === 'news' && (
+              <div className="space-y-3">
+                {newsList.filter(n => n.status === 'pending').length === 0 ? (
+                  <p className="text-gray-500 text-sm text-center py-10">Bekleyen haber yok.</p>
+                ) : (
+                  newsList.filter(n => n.status === 'pending').map(item => (
+                    <div key={item.id} className="bg-gray-900 p-4 rounded-xl flex items-start gap-4 border border-gray-800">
+                      {item.image && <img src={item.image} className="w-20 h-14 object-cover rounded flex-shrink-0" onError={e => (e.target as HTMLImageElement).style.display='none'} />}
+                      <div className="flex-1 min-w-0">
+                        <div className="font-bold text-white text-sm truncate">{item.title}</div>
+                        <div className="text-xs text-gray-400 mt-0.5 line-clamp-2">{item.excerpt}</div>
+                        <div className="text-xs text-gray-600 mt-1">{item.category} · {new Date(item.createdAt).toLocaleDateString('tr-TR')}</div>
+                      </div>
+                      <div className="flex gap-2 flex-shrink-0">
+                        <Button size="sm" onClick={() => handleApproveNews(item.id)}>Onayla</Button>
+                        <Button size="sm" variant="danger" onClick={() => handleDeleteNews(item.id, item.title)}>Reddet</Button>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
           </div>
       )}
 
@@ -1048,9 +1179,6 @@ const AdminDashboard = () => {
             <button onClick={() => setCommunityTab('reports')} className={`flex items-center gap-2 px-4 py-2.5 text-sm font-bold transition-colors border-b-2 -mb-px ${communityTab === 'reports' ? 'text-amber-500 border-amber-500' : 'text-gray-400 border-transparent hover:text-white'}`}>
               <Flag size={15}/> Şikayetler <span className="bg-gray-800 text-gray-400 text-[10px] px-1.5 py-0.5 rounded-full">{reports.filter(r => r.status === 'pending').length}</span>
             </button>
-            <button onClick={() => { setCommunityTab('contributions'); loadContributions(); }} className={`flex items-center gap-2 px-4 py-2.5 text-sm font-bold transition-colors border-b-2 -mb-px ${communityTab === 'contributions' ? 'text-amber-500 border-amber-500' : 'text-gray-400 border-transparent hover:text-white'}`}>
-              <PlaySquare size={15}/> Bölüm Katkıları <span className="bg-gray-800 text-gray-400 text-[10px] px-1.5 py-0.5 rounded-full">{contributions.filter(c => c.status === 'pending' || c.pendingAction).length}</span>
-            </button>
           </div>
 
           {communityTab === 'requests' && (
@@ -1127,127 +1255,6 @@ const AdminDashboard = () => {
             </div>
           )}
 
-          {communityTab === 'contributions' && (
-            <div className="space-y-3">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={15} />
-                <input type="text" placeholder="Anime ID, başlık, fansub veya kullanıcı ara..." value={contributionSearch} onChange={e => setContributionSearch(e.target.value)} className="w-full bg-gray-900 border border-gray-700 rounded-lg py-2 pl-9 pr-4 text-white text-sm focus:border-amber-500 focus:outline-none" />
-              </div>
-              {contributionsLoading ? (
-                <div className="text-gray-500 text-sm text-center py-10">Yükleniyor...</div>
-              ) : (() => {
-                const filtered = contributions.filter(c => !contributionSearch ||
-                  c.animeId.toLowerCase().includes(contributionSearch.toLowerCase()) ||
-                  c.episodeTitle.toLowerCase().includes(contributionSearch.toLowerCase()) ||
-                  c.fansubName.toLowerCase().includes(contributionSearch.toLowerCase()) ||
-                  (c.submitterUsername || '').toLowerCase().includes(contributionSearch.toLowerCase())
-                );
-                // Sort: pendingAction first, then pending, then approved, then rejected
-                const sorted = [
-                  ...filtered.filter(c => c.pendingAction),
-                  ...filtered.filter(c => !c.pendingAction && c.status === 'pending'),
-                  ...filtered.filter(c => !c.pendingAction && c.status === 'approved'),
-                  ...filtered.filter(c => !c.pendingAction && c.status === 'rejected'),
-                ];
-                if (sorted.length === 0) return <div className="text-center py-12 text-gray-600 text-sm">Katkı bulunamadı.</div>;
-                return sorted.map(c => (
-                  <div key={c.id} className="bg-[#18181b] border border-gray-800 rounded-xl p-4 space-y-3">
-                    <div className="flex items-start justify-between gap-3 flex-wrap">
-                      <div className="space-y-1 min-w-0 flex-1">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          {c.pendingAction === 'edit' && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full border bg-blue-500/10 text-blue-400 border-blue-500/30">Düzenleme İsteği</span>}
-                          {c.pendingAction === 'delete' && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full border bg-red-500/10 text-red-400 border-red-500/30">Silme İsteği</span>}
-                          {!c.pendingAction && c.status === 'pending' && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full border bg-amber-500/10 text-amber-400 border-amber-500/30">Onay Bekliyor</span>}
-                          {!c.pendingAction && c.status === 'approved' && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full border bg-green-500/10 text-green-400 border-green-500/30">Onaylandı</span>}
-                          {!c.pendingAction && c.status === 'rejected' && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full border bg-red-500/10 text-red-400 border-red-500/30">Reddedildi</span>}
-                        </div>
-                        <p className="text-xs text-gray-400">
-                          <span className="text-gray-500">Gönderen:</span> <span className="text-white font-bold">{c.submitterUsername || c.submittedBy.slice(0, 8)}</span>
-                        </p>
-                        <p className="text-sm text-white font-medium">
-                          Bölüm {c.episodeNumber}: {c.episodeTitle}
-                        </p>
-                        <p className="text-xs text-gray-500">
-                          <span className="text-gray-600">Anime:</span> {c.animeId} &nbsp;·&nbsp;
-                          <span className="text-amber-400 font-medium">{c.fansubName}</span> &nbsp;·&nbsp;
-                          {c.sources?.length || 0} kaynak
-                        </p>
-                        {c.pendingAction === 'edit' && c.pendingData && (
-                          <div className="text-xs text-blue-300 bg-blue-900/10 border border-blue-900/30 rounded-lg p-2 mt-1 space-y-0.5">
-                            <p className="font-bold">İstenen Değişiklikler:</p>
-                            {c.pendingData.fansubName && <p>Fansub: <span className="text-white">{c.pendingData.fansubName}</span></p>}
-                            {c.pendingData.episodeTitle && <p>Başlık: <span className="text-white">{c.pendingData.episodeTitle}</span></p>}
-                            {c.pendingData.sources && <p>Kaynaklar: <span className="text-white">{c.pendingData.sources.length} kaynak</span></p>}
-                          </div>
-                        )}
-                      </div>
-                      <p className="text-[10px] text-gray-600 flex-shrink-0">{new Date(c.createdAt).toLocaleDateString('tr-TR')}</p>
-                    </div>
-
-                    {/* Reject note input */}
-                    {rejectTarget === c.id && (
-                      <div className="flex gap-2 items-center">
-                        <input
-                          type="text"
-                          placeholder="Admin notu (isteğe bağlı)..."
-                          value={rejectNote}
-                          onChange={e => setRejectNote(e.target.value)}
-                          className="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-3 py-1.5 text-white text-xs focus:border-red-500 focus:outline-none"
-                          autoFocus
-                        />
-                        <button
-                          onClick={async () => {
-                            try {
-                              if (c.pendingAction) await rejectContributionAction(c.id);
-                              else await rejectContribution(c.id, rejectNote || undefined);
-                              setRejectTarget(null); setRejectNote(''); loadContributions();
-                            } catch (e: any) { alert(e.message); }
-                          }}
-                          className="text-xs font-bold px-3 py-1.5 rounded-lg bg-red-500 text-white hover:bg-red-600 transition-colors flex-shrink-0"
-                        >
-                          Reddet
-                        </button>
-                        <button onClick={() => { setRejectTarget(null); setRejectNote(''); }} className="text-xs text-gray-400 hover:text-white p-1"><X size={14}/></button>
-                      </div>
-                    )}
-
-                    {/* Action buttons */}
-                    <div className="flex gap-2 flex-wrap">
-                      {c.pendingAction ? (
-                        <>
-                          <button
-                            onClick={async () => { try { await approveContributionAction(c.id); loadContributions(); } catch (e: any) { alert(e.message); } }}
-                            className="text-xs font-bold px-3 py-1.5 rounded-lg bg-green-500/10 text-green-400 border border-green-500/30 hover:bg-green-500/20 transition-colors"
-                          >
-                            Değişikliği Onayla
-                          </button>
-                          {rejectTarget !== c.id && (
-                            <button onClick={() => { setRejectTarget(c.id); setRejectNote(''); }} className="text-xs font-bold px-3 py-1.5 rounded-lg bg-red-500/10 text-red-400 border border-red-500/30 hover:bg-red-500/20 transition-colors">
-                              Reddet
-                            </button>
-                          )}
-                        </>
-                      ) : c.status === 'pending' ? (
-                        <>
-                          <button
-                            onClick={async () => { try { await approveContribution(c.id); loadContributions(); } catch (e: any) { alert(e.message); } }}
-                            className="text-xs font-bold px-3 py-1.5 rounded-lg bg-green-500/10 text-green-400 border border-green-500/30 hover:bg-green-500/20 transition-colors"
-                          >
-                            Onayla
-                          </button>
-                          {rejectTarget !== c.id && (
-                            <button onClick={() => { setRejectTarget(c.id); setRejectNote(''); }} className="text-xs font-bold px-3 py-1.5 rounded-lg bg-red-500/10 text-red-400 border border-red-500/30 hover:bg-red-500/20 transition-colors">
-                              Reddet
-                            </button>
-                          )}
-                        </>
-                      ) : null}
-                    </div>
-                  </div>
-                ));
-              })()}
-            </div>
-          )}
         </div>
       )}
 

@@ -230,6 +230,8 @@ export interface EpisodeContribution {
   id: string;
   animeId: string;
   animeTitle?: string;
+  type?: 'episode' | 'source'; // 'episode' = new episode, 'source' = add to existing episode
+  targetEpisodeId?: string;    // for source type: which episode to add the fansub to
   episodeNumber: number;
   episodeTitle: string;
   thumbnail?: string;

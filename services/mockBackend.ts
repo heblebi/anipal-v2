@@ -1242,7 +1242,7 @@ export const fetchAnimeFromTurkishSite = async (inputUrl: string, _totalEpisodes
 
 export const submitContribution = async (
     userId: string,
-    data: { animeId: string; episodeNumber: number; episodeTitle: string; thumbnail?: string; fansubName: string; sources: { name: string; url: string }[] }
+    data: { animeId: string; episodeNumber: number; episodeTitle: string; thumbnail?: string; fansubName: string; sources: { name: string; url: string }[]; type?: 'episode' | 'source'; targetEpisodeId?: string }
 ) => {
     const { error } = await supabase.from('episode_contributions').insert({
         anime_id: data.animeId,
@@ -1253,6 +1253,8 @@ export const submitContribution = async (
         sources: data.sources,
         submitted_by: userId,
         status: 'pending',
+        type: data.type || 'episode',
+        target_episode_id: data.targetEpisodeId || null,
     });
     if (error) throw new Error(error.message);
 };
@@ -1267,6 +1269,8 @@ export const getMyContributions = async (userId: string): Promise<EpisodeContrib
     return (data || []).map((r: any) => ({
         id: r.id,
         animeId: r.anime_id,
+        type: r.type || 'episode',
+        targetEpisodeId: r.target_episode_id,
         episodeNumber: r.episode_number,
         episodeTitle: r.episode_title,
         thumbnail: r.thumbnail,
@@ -1292,6 +1296,8 @@ export const getPendingContributions = async (): Promise<EpisodeContribution[]> 
     return (data || []).map((r: any) => ({
         id: r.id,
         animeId: r.anime_id,
+        type: r.type || 'episode',
+        targetEpisodeId: r.target_episode_id,
         episodeNumber: r.episode_number,
         episodeTitle: r.episode_title,
         thumbnail: r.thumbnail,
@@ -1327,7 +1333,10 @@ export const approveContribution = async (id: string) => {
 
     // Get anime episodes
     const eps = await getEpisodesRaw(contrib.anime_id);
-    const epIdx = eps.findIndex((e: any) => e.number === contrib.episode_number);
+    // For source type: find by target_episode_id first, else fall back to episode_number
+    const epIdx = contrib.target_episode_id
+        ? eps.findIndex((e: any) => e.id === contrib.target_episode_id)
+        : eps.findIndex((e: any) => e.number === contrib.episode_number);
     const newFansub = {
         name: contrib.fansub_name,
         sources: contrib.sources,
@@ -1336,7 +1345,7 @@ export const approveContribution = async (id: string) => {
         contributorAvatar: profile?.avatar_url || null,
     };
 
-    if (epIdx === -1) {
+    if (epIdx === -1 && (contrib.type || 'episode') === 'episode') {
         // Create new episode
         eps.push({
             id: `ep-${Date.now()}`,
@@ -1349,7 +1358,7 @@ export const approveContribution = async (id: string) => {
             fansub: contrib.fansub_name,
             likes: 0,
         });
-    } else {
+    } else if (epIdx !== -1) {
         // Add fansub to existing episode
         const existing = eps[epIdx];
         const fansubs = existing.fansubs || [];
