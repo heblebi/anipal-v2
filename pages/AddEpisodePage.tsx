@@ -19,14 +19,19 @@ const newRow = (num = ''): EpisodeRow => ({ id: `${Date.now()}-${Math.random()}`
 const parseVideoLink = (url: string) => {
   const yt = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
   if (yt) return { name: 'YouTube', embedUrl: `https://www.youtube.com/embed/${yt[1]}`, thumbnail: `https://img.youtube.com/vi/${yt[1]}/maxresdefault.jpg` };
-  const ok = url.match(/ok\.ru\/video\/(\d+)/);
-  if (ok) return { name: 'Okru', embedUrl: `https://ok.ru/videoembed/${ok[1]}`, thumbnail: '' };
-  const sib = url.match(/video\.sibnet\.ru\/video(\d+)/);
-  if (sib) return { name: 'Sibnet', embedUrl: `https://video.sibnet.ru/shell.php?videoid=${sib[1]}`, thumbnail: '' };
-  const dm = url.match(/dailymotion\.com\/video\/([a-zA-Z0-9]+)/);
-  if (dm) return { name: 'Dailymotion', embedUrl: `https://www.dailymotion.com/embed/video/${dm[1]}`, thumbnail: '' };
-  const vimeo = url.match(/vimeo\.com\/(\d+)/);
-  if (vimeo) return { name: 'Vimeo', embedUrl: `https://player.vimeo.com/video/${vimeo[1]}`, thumbnail: '' };
+  const ytEmbed = url.match(/youtube\.com\/embed\/([a-zA-Z0-9_-]{11})/);
+  if (ytEmbed) return { name: 'YouTube', embedUrl: url, thumbnail: `https://img.youtube.com/vi/${ytEmbed[1]}/maxresdefault.jpg` };
+  if (url.includes('ok.ru')) return { name: 'Okru', embedUrl: url.includes('videoembed') ? url : url.replace(/ok\.ru\/video\/(\d+)/, 'ok.ru/videoembed/$1'), thumbnail: '' };
+  if (url.includes('sibnet.ru')) {
+    const sib = url.match(/videoid=(\d+)/) || url.match(/video\.sibnet\.ru\/video(\d+)/);
+    return { name: 'Sibnet', embedUrl: sib ? `https://video.sibnet.ru/shell.php?videoid=${sib[1]}` : url, thumbnail: '' };
+  }
+  if (url.includes('dailymotion.com')) return { name: 'Dailymotion', embedUrl: url.includes('/embed/') ? url : url.replace(/dailymotion\.com\/video\/([a-zA-Z0-9]+)/, 'dailymotion.com/embed/video/$1'), thumbnail: '' };
+  if (url.includes('vimeo.com')) return { name: 'Vimeo', embedUrl: url.includes('player.vimeo') ? url : url.replace(/vimeo\.com\/(\d+)/, 'player.vimeo.com/video/$1'), thumbnail: '' };
+  if (url.includes('drive.google.com')) return { name: 'Drive', embedUrl: url, thumbnail: '' };
+  if (url.includes('mail.ru') || url.includes('mycdn.me')) return { name: 'Mail.ru', embedUrl: url, thumbnail: '' };
+  if (url.includes('filemoon')) return { name: 'Filemoon', embedUrl: url, thumbnail: '' };
+  if (url.includes('streamtape')) return { name: 'Streamtape', embedUrl: url, thumbnail: '' };
   return { name: 'Diğer', embedUrl: url, thumbnail: '' };
 };
 
@@ -69,8 +74,10 @@ const AddEpisodePage = () => {
     setRows(p => p.map(r => r.id === rowId ? { ...r, fansubs: r.fansubs.map(f => f.id === fbId ? { ...f, sources: [...f.sources, newSource()] } : f) } : r));
   const removeSource = (rowId: string, fbId: string, srcId: string) =>
     setRows(p => p.map(r => r.id === rowId ? { ...r, fansubs: r.fansubs.map(f => f.id === fbId ? { ...f, sources: f.sources.filter(s => s.id !== srcId) } : f) } : r));
-  const updateSource = (rowId: string, fbId: string, srcId: string, field: 'name' | 'url', val: string) =>
-    setRows(p => p.map(r => r.id === rowId ? { ...r, fansubs: r.fansubs.map(f => f.id === fbId ? { ...f, sources: f.sources.map(s => s.id === srcId ? { ...s, [field]: val } : s) } : f) } : r));
+  const updateSource = (rowId: string, fbId: string, srcId: string, field: 'name' | 'url', val: string) => {
+    const extra = field === 'url' && val.startsWith('http') ? { name: parseVideoLink(val).name } : {};
+    setRows(p => p.map(r => r.id === rowId ? { ...r, fansubs: r.fansubs.map(f => f.id === fbId ? { ...f, sources: f.sources.map(s => s.id === srcId ? { ...s, [field]: val, ...extra } : s) } : f) } : r));
+  };
 
   const handlePaste = (rowId: string, fbId: string, srcId: string, e: React.ClipboardEvent) => {
     const text = e.clipboardData.getData('text');

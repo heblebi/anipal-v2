@@ -100,8 +100,10 @@ const AdminDashboard = () => {
     setEpisodeRows(prev => prev.map(r => r.id === rowId ? { ...r, fansubs: r.fansubs.map(f => f.id === fbId ? { ...f, sources: [...f.sources, { id: Date.now().toString(), name: 'Sibnet', url: '' }] } : f) } : r));
   const removeSource = (rowId: string, fbId: string, srcId: string) =>
     setEpisodeRows(prev => prev.map(r => r.id === rowId ? { ...r, fansubs: r.fansubs.map(f => f.id === fbId ? { ...f, sources: f.sources.filter(s => s.id !== srcId) } : f) } : r));
-  const updateSource = (rowId: string, fbId: string, srcId: string, field: 'name' | 'url', value: string) =>
-    setEpisodeRows(prev => prev.map(r => r.id === rowId ? { ...r, fansubs: r.fansubs.map(f => f.id === fbId ? { ...f, sources: f.sources.map(s => s.id === srcId ? { ...s, [field]: value } : s) } : f) } : r));
+  const updateSource = (rowId: string, fbId: string, srcId: string, field: 'name' | 'url', value: string) => {
+    const extra = field === 'url' && value.startsWith('http') ? { name: parseVideoLink(value).name } : {};
+    setEpisodeRows(prev => prev.map(r => r.id === rowId ? { ...r, fansubs: r.fansubs.map(f => f.id === fbId ? { ...f, sources: f.sources.map(s => s.id === srcId ? { ...s, [field]: value, ...extra } : s) } : f) } : r));
+  };
   const handleSourcePaste = (rowId: string, fbId: string, srcId: string, e: React.ClipboardEvent<HTMLInputElement>) => {
     const pasted = e.clipboardData.getData('text').trim();
     if (!pasted.startsWith('http')) return;
@@ -1505,7 +1507,7 @@ const AdminDashboard = () => {
                     {fb.sources.map((src) => (
                       <div key={src.id} className="flex gap-1.5 items-center">
                         <input type="text" list="ep-edit-presets" value={src.name} onChange={e => setEditingEp(prev => prev && ({ ...prev, fansubs: prev.fansubs.map(f => f.id !== fb.id ? f : { ...f, sources: f.sources.map(s => s.id === src.id ? { ...s, name: e.target.value } : s) }) }))} className="w-20 flex-shrink-0 bg-gray-800 border border-gray-600 rounded px-2 py-1.5 text-white text-xs focus:border-amber-500 focus:outline-none" />
-                        <input type="text" placeholder="Embed link..." value={src.url} onChange={e => setEditingEp(prev => prev && ({ ...prev, fansubs: prev.fansubs.map(f => f.id !== fb.id ? f : { ...f, sources: f.sources.map(s => s.id === src.id ? { ...s, url: e.target.value } : s) }) }))} className="flex-1 min-w-0 bg-gray-800 border border-gray-600 rounded px-2 py-1.5 text-white text-xs focus:border-amber-500 focus:outline-none" />
+                        <input type="text" placeholder="Embed link..." value={src.url} onChange={e => { const url = e.target.value; const autoName = url.startsWith('http') ? parseVideoLink(url).name : null; setEditingEp(prev => prev && ({ ...prev, fansubs: prev.fansubs.map(f => f.id !== fb.id ? f : { ...f, sources: f.sources.map(s => s.id === src.id ? { ...s, url, ...(autoName ? { name: autoName } : {}) } : s) }) })); }} className="flex-1 min-w-0 bg-gray-800 border border-gray-600 rounded px-2 py-1.5 text-white text-xs focus:border-amber-500 focus:outline-none" />
                         {fb.sources.length > 1 && <button type="button" onClick={() => setEditingEp(prev => prev && ({ ...prev, fansubs: prev.fansubs.map(f => f.id !== fb.id ? f : { ...f, sources: f.sources.filter(s => s.id !== src.id) }) }))} className="text-red-500 p-1"><X size={12}/></button>}
                       </div>
                     ))}
@@ -1607,6 +1609,10 @@ const parseVideoLink = (url: string): { embedUrl: string; thumbnail: string; nam
   // Google Drive
   const drive = url.match(/drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)/);
   if (drive) return { name: 'Drive', embedUrl: `https://drive.google.com/file/d/${drive[1]}/preview`, thumbnail: '' };
+  // Known hosts — use as-is
+  if (url.includes('mail.ru') || url.includes('mycdn.me')) return { name: 'Mail.ru', embedUrl: url, thumbnail: '' };
+  if (url.includes('filemoon')) return { name: 'Filemoon', embedUrl: url, thumbnail: '' };
+  if (url.includes('streamtape')) return { name: 'Streamtape', embedUrl: url, thumbnail: '' };
   // Fembed / diğer embed linkleri — olduğu gibi kullan
   return { name: 'Fembed', embedUrl: url, thumbnail: '' };
 };
