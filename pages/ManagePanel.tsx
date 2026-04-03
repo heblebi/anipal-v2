@@ -7,8 +7,10 @@ import Button from '../components/Button';
 import {
   getAnimes, createAnimeWithEpisodes, deleteAnime, deleteEpisode, updateEpisode, updateAnime,
   getNews, createNews, updateNews, deleteNews, fetchANNArticle,
+  getMyContributions, requestEditContribution, requestDeleteContribution,
 } from '../services/mockBackend';
-import { Plus, Trash2, Pencil, X, Save, ChevronDown, ChevronRight, Globe, Loader2, CheckCircle2, AlertCircle } from 'lucide-react';
+import { EpisodeContribution } from '../types';
+import { Plus, Trash2, Pencil, X, Save, ChevronDown, ChevronRight, Globe, Loader2, CheckCircle2, AlertCircle, Clock } from 'lucide-react';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 interface SourceRow { id: string; name: string; url: string; }
@@ -90,8 +92,19 @@ const ManagePanel = () => {
     }
   };
 
+  // ─── Contribution state ────────────────────────────────────────────────────
+  const [contributions, setContributions] = useState<EpisodeContribution[]>([]);
+  const [loadingContribs, setLoadingContribs] = useState(false);
+  const [deletingContribId, setDeletingContribId] = useState<string | null>(null);
+
+  const loadContributions = async () => {
+    if (!user) return;
+    setLoadingContribs(true);
+    try { setContributions(await getMyContributions(user.id)); } catch {} finally { setLoadingContribs(false); }
+  };
+
   useEffect(() => {
-    if (isMod && tab === 'mine') loadAnimes();
+    if (isMod && tab === 'mine') { loadAnimes(); loadContributions(); }
     if (isMod && tab === 'all') loadAllAnimes();
   }, [tab]);
 
@@ -442,6 +455,66 @@ const ManagePanel = () => {
                 )}
               </div>
             ))}
+
+            {/* Katkılarım */}
+            <div className="pt-4 border-t border-gray-800 space-y-3">
+              <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Bölüm Katkılarım</p>
+              {loadingContribs ? (
+                <div className="text-center py-6 text-gray-500"><Loader2 size={20} className="animate-spin inline" /></div>
+              ) : contributions.length === 0 ? (
+                <p className="text-xs text-gray-600 py-4 text-center">Henüz katkınız yok.</p>
+              ) : contributions.map(c => (
+                <div key={c.id} className="bg-gray-900/60 border border-gray-800 rounded-xl p-3 flex items-start justify-between gap-3">
+                  <div className="min-w-0 space-y-0.5">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                        c.pendingAction ? 'bg-blue-500/10 text-blue-400 border-blue-500/30' :
+                        c.status === 'approved' ? 'bg-green-500/10 text-green-400 border-green-500/30' :
+                        c.status === 'rejected' ? 'bg-red-500/10 text-red-400 border-red-500/30' :
+                        'bg-amber-500/10 text-amber-400 border-amber-500/30'
+                      }`}>
+                        {c.pendingAction === 'delete' ? 'Silme Bekleniyor' :
+                         c.pendingAction === 'edit' ? 'Düzenleme Bekleniyor' :
+                         c.status === 'approved' ? 'Onaylandı' :
+                         c.status === 'rejected' ? 'Reddedildi' : 'Onay Bekliyor'}
+                      </span>
+                    </div>
+                    <p className="text-sm text-white font-medium">Bölüm {c.episodeNumber}: {c.episodeTitle}</p>
+                    <p className="text-xs text-amber-400">{c.fansubName}</p>
+                    {c.adminNote && <p className="text-xs text-red-400 italic">"{c.adminNote}"</p>}
+                  </div>
+                  {c.status === 'approved' && !c.pendingAction && (
+                    <div className="flex gap-1.5 flex-shrink-0">
+                      <button
+                        onClick={() => setDeletingContribId(c.id)}
+                        className="p-1.5 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-lg transition-colors"
+                        title="Silme isteği gönder"
+                      ><Trash2 size={13} /></button>
+                    </div>
+                  )}
+                  {c.pendingAction && (
+                    <Clock size={13} className="text-gray-600 flex-shrink-0 mt-1" />
+                  )}
+                </div>
+              ))}
+            </div>
+
+            {/* Silme onay dialog */}
+            {deletingContribId && (
+              <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4">
+                <div className="bg-[#18181b] border border-gray-700 rounded-2xl p-6 w-full max-w-sm space-y-4">
+                  <p className="text-white font-bold">Silme isteği gönderilsin mi?</p>
+                  <p className="text-xs text-gray-400">Admin onayladıktan sonra katkınız kaldırılacak.</p>
+                  <div className="flex gap-3">
+                    <button onClick={() => setDeletingContribId(null)} className="flex-1 py-2 rounded-xl border border-gray-700 text-gray-300 text-sm font-bold">İptal</button>
+                    <button onClick={async () => {
+                      try { await requestDeleteContribution(deletingContribId); loadContributions(); } catch {}
+                      setDeletingContribId(null);
+                    }} className="flex-1 py-2 rounded-xl bg-red-600 hover:bg-red-500 text-white text-sm font-bold">Gönder</button>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
