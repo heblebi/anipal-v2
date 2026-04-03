@@ -1238,10 +1238,12 @@ export const fetchAnimeFromTurkishSite = async (inputUrl: string, _totalEpisodes
     }
 };
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export const getMiniProfiles = async (ids: string[]): Promise<Map<string, { username: string; avatar: string }>> => {
-    const unique = [...new Set(ids.filter(Boolean))];
+    const unique = [...new Set(ids.filter(id => id && UUID_RE.test(id)))];
     if (!unique.length) return new Map();
-    const { data } = await supabase.from('profiles').select('id, username, avatar_url').in('id', unique);
+    const { data, error } = await supabase.from('profiles').select('id, username, avatar_url').in('id', unique);
+    if (error) return new Map();
     return new Map((data || []).map((p: any) => [p.id, { username: p.username, avatar: p.avatar_url || '' }]));
 };
 
@@ -1251,7 +1253,8 @@ export const submitContribution = async (
     userId: string,
     data: { animeId: string; episodeNumber: number; episodeTitle: string; thumbnail?: string; fansubName: string; sources: { name: string; url: string }[]; type?: 'episode' | 'source'; targetEpisodeId?: string }
 ) => {
-    const { error } = await supabase.from('episode_contributions').insert({
+    // Try insert with type columns first; fall back without them if migration not yet applied
+    let { error } = await supabase.from('episode_contributions').insert({
         anime_id: data.animeId,
         episode_number: data.episodeNumber,
         episode_title: data.episodeTitle,
@@ -1263,6 +1266,20 @@ export const submitContribution = async (
         type: data.type || 'episode',
         target_episode_id: data.targetEpisodeId || null,
     });
+    if (error && error.message.includes('target_episode_id')) {
+        // Migration not applied yet — insert without new columns
+        const res = await supabase.from('episode_contributions').insert({
+            anime_id: data.animeId,
+            episode_number: data.episodeNumber,
+            episode_title: data.episodeTitle,
+            thumbnail: data.thumbnail || '',
+            fansub_name: data.fansubName,
+            sources: data.sources,
+            submitted_by: userId,
+            status: 'pending',
+        });
+        error = res.error;
+    }
     if (error) throw new Error(error.message);
 };
 
