@@ -348,12 +348,12 @@ const AnimeDetail = () => {
                                 const fb = getEpFansubs(selectedEpisode).find(f => f.name === selectedFansubName);
                                 if (!fb?.contributorUsername) return null;
                                 return (
-                                  <Link to={`/profile/${fb.contributorId}`} className="flex items-center gap-1.5 group" title={`${fb.contributorUsername} tarafından eklendi`}>
+                                  <Link to={`/profile/${fb.contributorId}`} className="flex items-center gap-1.5 group">
                                     {fb.contributorAvatar
-                                      ? <img src={fb.contributorAvatar} className="w-4 h-4 rounded-full object-cover opacity-60 group-hover:opacity-100 transition-opacity" alt="" />
-                                      : <div className="w-4 h-4 rounded-full bg-gray-700 flex items-center justify-center opacity-60 group-hover:opacity-100 transition-opacity"><span className="text-[8px] text-gray-400">{fb.contributorUsername[0].toUpperCase()}</span></div>
+                                      ? <img src={fb.contributorAvatar} className="w-5 h-5 rounded-full object-cover ring-1 ring-gray-700" alt="" />
+                                      : <div className="w-5 h-5 rounded-full bg-gray-700 flex items-center justify-center ring-1 ring-gray-600"><span className="text-[9px] text-gray-300 font-bold">{fb.contributorUsername[0].toUpperCase()}</span></div>
                                     }
-                                    <span className="text-[11px] text-gray-500 group-hover:text-gray-300 transition-colors">{fb.contributorUsername}</span>
+                                    <span className="text-xs text-gray-400 group-hover:text-amber-400 transition-colors"><span className="text-gray-600">ekleyen:</span> <span className="font-medium">{fb.contributorUsername}</span></span>
                                   </Link>
                                 );
                               })()}

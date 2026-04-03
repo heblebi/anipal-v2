@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Play, ExternalLink } from 'lucide-react';
+import { Play } from 'lucide-react';
 
 interface VideoPlayerProps {
   embedUrl: string;
@@ -101,17 +101,6 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ embedUrl: raw, poster, onPlay
           allowFullScreen
           scrolling="no"
         />
-      </div>
-      <div className="flex justify-end">
-        <a
-          href={src}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex items-center gap-1.5 text-xs text-gray-500 hover:text-amber-400 transition-colors"
-        >
-          <ExternalLink size={12} />
-          Videoyu yeni sekmede aç
-        </a>
       </div>
     </div>
   );
