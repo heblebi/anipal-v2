@@ -284,16 +284,6 @@ const AnimeDetail = () => {
                       </div>
                     </div>
                   )}
-                  {/* Katkıda bulunan */}
-                  {activeFansub.contributorUsername && (
-                    <Link to={`/profile/${activeFansub.contributorId}`} className="flex items-center gap-2 group w-fit">
-                      {activeFansub.contributorAvatar
-                        ? <img src={activeFansub.contributorAvatar} className="w-5 h-5 rounded-full object-cover ring-1 ring-gray-700" alt="" />
-                        : <div className="w-5 h-5 rounded-full bg-gray-700 ring-1 ring-gray-600 flex items-center justify-center"><span className="text-[9px] text-gray-300 font-bold">{activeFansub.contributorUsername[0].toUpperCase()}</span></div>
-                      }
-                      <span className="text-xs text-gray-500 group-hover:text-amber-400 transition-colors">ekleyen: <span className="font-semibold text-gray-300 group-hover:text-amber-400">{activeFansub.contributorUsername}</span></span>
-                    </Link>
-                  )}
                   {/* Kaynak seçici */}
                   <div>
                     <p className="text-xs text-gray-500 font-bold uppercase mb-2">Oynatıcı Seç</p>
@@ -381,6 +371,24 @@ const AnimeDetail = () => {
                             </Button>
                         </div>
                     </div>
+
+                    {/* Katkıda bulunan */}
+                    {(() => {
+                      const fb = getEpFansubs(selectedEpisode).find(f => f.name === selectedFansubName);
+                      if (!fb?.contributorUsername) return null;
+                      return (
+                        <Link to={`/profile/${fb.contributorId}`} className="flex items-center gap-3 group w-fit pt-1">
+                          {fb.contributorAvatar
+                            ? <img src={fb.contributorAvatar} className="w-9 h-9 rounded-full object-cover ring-2 ring-gray-700 group-hover:ring-amber-500 transition-all" alt="" />
+                            : <div className="w-9 h-9 rounded-full bg-gray-700 ring-2 ring-gray-600 group-hover:ring-amber-500 transition-all flex items-center justify-center"><span className="text-sm text-gray-300 font-bold">{fb.contributorUsername[0].toUpperCase()}</span></div>
+                          }
+                          <div>
+                            <p className="text-sm font-semibold text-white group-hover:text-amber-400 transition-colors leading-tight">{fb.contributorUsername}</p>
+                            <p className="text-xs text-gray-500">Tarafından Eklendi</p>
+                          </div>
+                        </Link>
+                      );
+                    })()}
 
                     {/* Prev / Next Episode Buttons */}
                     <div className="flex gap-2">
