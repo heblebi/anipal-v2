@@ -22,6 +22,8 @@ import FriendsPage from './pages/FriendsPage';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { SiteSettingsProvider } from './context/SiteSettingsContext';
 import { UserRole } from './types';
+import ContributePage from './pages/ContributePage';
+import MyContributionsPage from './pages/MyContributionsPage';
 
 // Normal kullanıcı korumalı rota
 const ProtectedRoute = ({ children, requireRole }: { children?: React.ReactNode, requireRole?: UserRole[] }) => {
@@ -59,9 +61,9 @@ const AppRoutes = () => {
 
       {/* Admin paneli — normal Supabase auth, ADMIN rolü gerekli */}
       <Route path="/admin" element={<AdminLogin />} />
-      <Route path="/admin/dashboard" element={<ProtectedRoute requireRole={[UserRole.ADMIN]}><AdminDashboard /></ProtectedRoute>} />
+      <Route path="/admin/dashboard" element={<ProtectedRoute requireRole={[UserRole.ADMIN, UserRole.EDITOR]}><AdminDashboard /></ProtectedRoute>} />
       <Route path="/admin/add-anime" element={<ProtectedRoute requireRole={[UserRole.ADMIN]}><AddAnimePage /></ProtectedRoute>} />
-      <Route path="/admin/add-episode/:id" element={<ProtectedRoute requireRole={[UserRole.ADMIN]}><AddEpisodePage /></ProtectedRoute>} />
+      <Route path="/admin/add-episode/:id" element={<ProtectedRoute requireRole={[UserRole.ADMIN, UserRole.MODERATOR]}><AddEpisodePage /></ProtectedRoute>} />
 
       {/* Moderatör / Editör paneli */}
       <Route path="/panel" element={
@@ -69,6 +71,11 @@ const AppRoutes = () => {
           <ManagePanel />
         </ProtectedRoute>
       } />
+
+      {/* Bölüm katkısı */}
+      <Route path="/contribute" element={<ProtectedRoute requireRole={[UserRole.EDITOR, UserRole.ADMIN, UserRole.MODERATOR]}><ContributePage /></ProtectedRoute>} />
+      <Route path="/contribute/:animeId" element={<ProtectedRoute requireRole={[UserRole.EDITOR, UserRole.ADMIN, UserRole.MODERATOR]}><ContributePage /></ProtectedRoute>} />
+      <Route path="/my-contributions" element={<ProtectedRoute><MyContributionsPage /></ProtectedRoute>} />
 
       {/* Eski /add-anime linkini admin'e yönlendir */}
       <Route path="/add-anime" element={<Navigate to="/admin/add-anime" />} />

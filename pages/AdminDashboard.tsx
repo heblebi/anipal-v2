@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { UserRole, Anime, User, AnimeStatus, SiteStats, NewsItem, AnimeRequest } from '../types';
+import { UserRole, Anime, User, AnimeStatus, SiteStats, NewsItem, AnimeRequest, EpisodeContribution } from '../types';
 import { useNavigate } from 'react-router-dom';
 import Input from '../components/Input';
 import Button from '../components/Button';
-import { addEpisodes, getAnimes, getSiteStats, getUsers, banUser, unbanUser, approveAnime, updateUserRole, deleteAnime, deleteEpisode, updateEpisode, getNews, createNews, updateNews, deleteNews, approveNews, fetchANNArticle, getAnimeRequests, updateAnimeRequestStatus, deleteUser } from '../services/mockBackend';
+import { addEpisodes, getAnimes, getSiteStats, getUsers, banUser, unbanUser, approveAnime, updateUserRole, deleteAnime, deleteEpisode, updateEpisode, getNews, createNews, updateNews, deleteNews, approveNews, fetchANNArticle, getAnimeRequests, updateAnimeRequestStatus, deleteUser, getPendingContributions, approveContribution, rejectContribution, approveContributionAction, rejectContributionAction } from '../services/mockBackend';
 import { getReports, updateReportStatus } from '../services/socialBackend';
 import type { Report } from '../types';
 
@@ -36,7 +36,7 @@ const AdminDashboard = () => {
   const navigate = useNavigate();
   const isEditor = user?.role === UserRole.EDITOR;
   const [activeTab, setActiveTab] = useState<'stats' | 'manage' | 'news' | 'moderation' | 'users' | 'assets' | 'community'>(isEditor ? 'news' : 'stats');
-  const [communityTab, setCommunityTab] = useState<'requests' | 'reports'>('requests');
+  const [communityTab, setCommunityTab] = useState<'requests' | 'reports' | 'contributions'>('requests');
   const { settings: siteSettings, uploadAndSave } = useSiteSettings();
   const [assetCrop, setAssetCrop] = useState<{ src: string; asset: SiteAsset } | null>(null);
   const [assetSaving, setAssetSaving] = useState<string | null>(null);
@@ -45,6 +45,13 @@ const AdminDashboard = () => {
   const [requestsLoading, setRequestsLoading] = useState(false);
   const [reports, setReports] = useState<Report[]>([]);
   const [reportsLoading, setReportsLoading] = useState(false);
+  const [contributions, setContributions] = useState<EpisodeContribution[]>([]);
+  const [contributionsLoading, setContributionsLoading] = useState(false);
+  const [contributionSearch, setContributionSearch] = useState('');
+  const [requestSearch, setRequestSearch] = useState('');
+  const [reportSearch, setReportSearch] = useState('');
+  const [rejectNote, setRejectNote] = useState('');
+  const [rejectTarget, setRejectTarget] = useState<string | null>(null);
   const [visitorCount, setVisitorCount] = useState(0);
   const assetFileRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const [animes, setAnimes] = useState<Anime[]>([]);
@@ -137,6 +144,11 @@ const AdminDashboard = () => {
   const loadReports = async () => {
     setReportsLoading(true);
     try { setReports(await getReports()); } catch { /* ignore */ } finally { setReportsLoading(false); }
+  };
+
+  const loadContributions = async () => {
+    setContributionsLoading(true);
+    try { setContributions(await getPendingContributions()); } catch { /* ignore */ } finally { setContributionsLoading(false); }
   };
 
   // Unique visitor count (localStorage based, device+browser = 1 visit per day)
@@ -466,7 +478,7 @@ const AdminDashboard = () => {
              <>
                 <TabButton active={activeTab==='moderation'} onClick={()=>setActiveTab('moderation')} icon={<CheckCircle size={18}/>}>Onay Bekleyenler</TabButton>
                 <TabButton active={activeTab==='users'} onClick={()=>setActiveTab('users')} icon={<Users size={18}/>}>Kullanıcılar</TabButton>
-                <TabButton active={activeTab==='community'} onClick={()=>{ setActiveTab('community'); loadRequests(); loadReports(); }} icon={<Flag size={18}/>}>İstek & Şikayetler</TabButton>
+                <TabButton active={activeTab==='community'} onClick={()=>{ setActiveTab('community'); loadRequests(); loadReports(); loadContributions(); }} icon={<Flag size={18}/>}>İstek & Şikayetler</TabButton>
                 <TabButton active={activeTab==='assets'} onClick={()=>setActiveTab('assets')} icon={<ImageIcon size={18}/>}>Site Görselleri</TabButton>
              </>
           )}
@@ -1029,22 +1041,29 @@ const AdminDashboard = () => {
       {activeTab === 'community' && (
         <div className="space-y-4">
           {/* Inner tabs */}
-          <div className="flex gap-2 border-b border-gray-800 pb-1">
+          <div className="flex gap-2 border-b border-gray-800 pb-1 flex-wrap">
             <button onClick={() => setCommunityTab('requests')} className={`flex items-center gap-2 px-4 py-2.5 text-sm font-bold transition-colors border-b-2 -mb-px ${communityTab === 'requests' ? 'text-amber-500 border-amber-500' : 'text-gray-400 border-transparent hover:text-white'}`}>
               <Send size={15}/> İstekler & Öneriler <span className="bg-gray-800 text-gray-400 text-[10px] px-1.5 py-0.5 rounded-full">{requests.length}</span>
             </button>
             <button onClick={() => setCommunityTab('reports')} className={`flex items-center gap-2 px-4 py-2.5 text-sm font-bold transition-colors border-b-2 -mb-px ${communityTab === 'reports' ? 'text-amber-500 border-amber-500' : 'text-gray-400 border-transparent hover:text-white'}`}>
               <Flag size={15}/> Şikayetler <span className="bg-gray-800 text-gray-400 text-[10px] px-1.5 py-0.5 rounded-full">{reports.filter(r => r.status === 'pending').length}</span>
             </button>
+            <button onClick={() => { setCommunityTab('contributions'); loadContributions(); }} className={`flex items-center gap-2 px-4 py-2.5 text-sm font-bold transition-colors border-b-2 -mb-px ${communityTab === 'contributions' ? 'text-amber-500 border-amber-500' : 'text-gray-400 border-transparent hover:text-white'}`}>
+              <PlaySquare size={15}/> Bölüm Katkıları <span className="bg-gray-800 text-gray-400 text-[10px] px-1.5 py-0.5 rounded-full">{contributions.filter(c => c.status === 'pending' || c.pendingAction).length}</span>
+            </button>
           </div>
 
           {communityTab === 'requests' && (
             <div className="space-y-3">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={15} />
+                <input type="text" placeholder="Anime adı veya kullanıcı ara..." value={requestSearch} onChange={e => setRequestSearch(e.target.value)} className="w-full bg-gray-900 border border-gray-700 rounded-lg py-2 pl-9 pr-4 text-white text-sm focus:border-amber-500 focus:outline-none" />
+              </div>
               {requestsLoading ? (
                 <div className="text-center py-10 text-gray-500">Yükleniyor...</div>
-              ) : requests.length === 0 ? (
+              ) : requests.filter(r => !requestSearch || r.animeName.toLowerCase().includes(requestSearch.toLowerCase()) || r.username.toLowerCase().includes(requestSearch.toLowerCase())).length === 0 ? (
                 <div className="text-center py-10 text-gray-500">Henüz istek yok.</div>
-              ) : requests.map(req => (
+              ) : requests.filter(r => !requestSearch || r.animeName.toLowerCase().includes(requestSearch.toLowerCase()) || r.username.toLowerCase().includes(requestSearch.toLowerCase())).map(req => (
                 <div key={req.id} className="bg-gray-900 border border-gray-800 rounded-xl p-4 flex items-start gap-4">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap mb-1">
@@ -1073,11 +1092,15 @@ const AdminDashboard = () => {
 
           {communityTab === 'reports' && (
             <div className="space-y-3">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={15} />
+                <input type="text" placeholder="Sebep veya kullanıcı ara..." value={reportSearch} onChange={e => setReportSearch(e.target.value)} className="w-full bg-gray-900 border border-gray-700 rounded-lg py-2 pl-9 pr-4 text-white text-sm focus:border-amber-500 focus:outline-none" />
+              </div>
               {reportsLoading ? (
                 <div className="text-gray-500 text-sm text-center py-10">Yükleniyor...</div>
-              ) : reports.length === 0 ? (
+              ) : reports.filter(r => !reportSearch || r.reason.toLowerCase().includes(reportSearch.toLowerCase()) || (r.reporterUsername || '').toLowerCase().includes(reportSearch.toLowerCase()) || (r.reportedUsername || '').toLowerCase().includes(reportSearch.toLowerCase())).length === 0 ? (
                 <div className="text-center py-12 text-gray-600 text-sm">Şikayet yok.</div>
-              ) : reports.map(r => (
+              ) : reports.filter(r => !reportSearch || r.reason.toLowerCase().includes(reportSearch.toLowerCase()) || (r.reporterUsername || '').toLowerCase().includes(reportSearch.toLowerCase()) || (r.reportedUsername || '').toLowerCase().includes(reportSearch.toLowerCase())).map(r => (
                 <div key={r.id} className="bg-[#18181b] border border-gray-800 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center gap-4">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
@@ -1101,6 +1124,128 @@ const AdminDashboard = () => {
                   )}
                 </div>
               ))}
+            </div>
+          )}
+
+          {communityTab === 'contributions' && (
+            <div className="space-y-3">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={15} />
+                <input type="text" placeholder="Anime ID, başlık, fansub veya kullanıcı ara..." value={contributionSearch} onChange={e => setContributionSearch(e.target.value)} className="w-full bg-gray-900 border border-gray-700 rounded-lg py-2 pl-9 pr-4 text-white text-sm focus:border-amber-500 focus:outline-none" />
+              </div>
+              {contributionsLoading ? (
+                <div className="text-gray-500 text-sm text-center py-10">Yükleniyor...</div>
+              ) : (() => {
+                const filtered = contributions.filter(c => !contributionSearch ||
+                  c.animeId.toLowerCase().includes(contributionSearch.toLowerCase()) ||
+                  c.episodeTitle.toLowerCase().includes(contributionSearch.toLowerCase()) ||
+                  c.fansubName.toLowerCase().includes(contributionSearch.toLowerCase()) ||
+                  (c.submitterUsername || '').toLowerCase().includes(contributionSearch.toLowerCase())
+                );
+                // Sort: pendingAction first, then pending, then approved, then rejected
+                const sorted = [
+                  ...filtered.filter(c => c.pendingAction),
+                  ...filtered.filter(c => !c.pendingAction && c.status === 'pending'),
+                  ...filtered.filter(c => !c.pendingAction && c.status === 'approved'),
+                  ...filtered.filter(c => !c.pendingAction && c.status === 'rejected'),
+                ];
+                if (sorted.length === 0) return <div className="text-center py-12 text-gray-600 text-sm">Katkı bulunamadı.</div>;
+                return sorted.map(c => (
+                  <div key={c.id} className="bg-[#18181b] border border-gray-800 rounded-xl p-4 space-y-3">
+                    <div className="flex items-start justify-between gap-3 flex-wrap">
+                      <div className="space-y-1 min-w-0 flex-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          {c.pendingAction === 'edit' && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full border bg-blue-500/10 text-blue-400 border-blue-500/30">Düzenleme İsteği</span>}
+                          {c.pendingAction === 'delete' && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full border bg-red-500/10 text-red-400 border-red-500/30">Silme İsteği</span>}
+                          {!c.pendingAction && c.status === 'pending' && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full border bg-amber-500/10 text-amber-400 border-amber-500/30">Onay Bekliyor</span>}
+                          {!c.pendingAction && c.status === 'approved' && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full border bg-green-500/10 text-green-400 border-green-500/30">Onaylandı</span>}
+                          {!c.pendingAction && c.status === 'rejected' && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full border bg-red-500/10 text-red-400 border-red-500/30">Reddedildi</span>}
+                        </div>
+                        <p className="text-xs text-gray-400">
+                          <span className="text-gray-500">Gönderen:</span> <span className="text-white font-bold">{c.submitterUsername || c.submittedBy.slice(0, 8)}</span>
+                        </p>
+                        <p className="text-sm text-white font-medium">
+                          Bölüm {c.episodeNumber}: {c.episodeTitle}
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          <span className="text-gray-600">Anime:</span> {c.animeId} &nbsp;·&nbsp;
+                          <span className="text-amber-400 font-medium">{c.fansubName}</span> &nbsp;·&nbsp;
+                          {c.sources?.length || 0} kaynak
+                        </p>
+                        {c.pendingAction === 'edit' && c.pendingData && (
+                          <div className="text-xs text-blue-300 bg-blue-900/10 border border-blue-900/30 rounded-lg p-2 mt-1 space-y-0.5">
+                            <p className="font-bold">İstenen Değişiklikler:</p>
+                            {c.pendingData.fansubName && <p>Fansub: <span className="text-white">{c.pendingData.fansubName}</span></p>}
+                            {c.pendingData.episodeTitle && <p>Başlık: <span className="text-white">{c.pendingData.episodeTitle}</span></p>}
+                            {c.pendingData.sources && <p>Kaynaklar: <span className="text-white">{c.pendingData.sources.length} kaynak</span></p>}
+                          </div>
+                        )}
+                      </div>
+                      <p className="text-[10px] text-gray-600 flex-shrink-0">{new Date(c.createdAt).toLocaleDateString('tr-TR')}</p>
+                    </div>
+
+                    {/* Reject note input */}
+                    {rejectTarget === c.id && (
+                      <div className="flex gap-2 items-center">
+                        <input
+                          type="text"
+                          placeholder="Admin notu (isteğe bağlı)..."
+                          value={rejectNote}
+                          onChange={e => setRejectNote(e.target.value)}
+                          className="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-3 py-1.5 text-white text-xs focus:border-red-500 focus:outline-none"
+                          autoFocus
+                        />
+                        <button
+                          onClick={async () => {
+                            try {
+                              if (c.pendingAction) await rejectContributionAction(c.id);
+                              else await rejectContribution(c.id, rejectNote || undefined);
+                              setRejectTarget(null); setRejectNote(''); loadContributions();
+                            } catch (e: any) { alert(e.message); }
+                          }}
+                          className="text-xs font-bold px-3 py-1.5 rounded-lg bg-red-500 text-white hover:bg-red-600 transition-colors flex-shrink-0"
+                        >
+                          Reddet
+                        </button>
+                        <button onClick={() => { setRejectTarget(null); setRejectNote(''); }} className="text-xs text-gray-400 hover:text-white p-1"><X size={14}/></button>
+                      </div>
+                    )}
+
+                    {/* Action buttons */}
+                    <div className="flex gap-2 flex-wrap">
+                      {c.pendingAction ? (
+                        <>
+                          <button
+                            onClick={async () => { try { await approveContributionAction(c.id); loadContributions(); } catch (e: any) { alert(e.message); } }}
+                            className="text-xs font-bold px-3 py-1.5 rounded-lg bg-green-500/10 text-green-400 border border-green-500/30 hover:bg-green-500/20 transition-colors"
+                          >
+                            Değişikliği Onayla
+                          </button>
+                          {rejectTarget !== c.id && (
+                            <button onClick={() => { setRejectTarget(c.id); setRejectNote(''); }} className="text-xs font-bold px-3 py-1.5 rounded-lg bg-red-500/10 text-red-400 border border-red-500/30 hover:bg-red-500/20 transition-colors">
+                              Reddet
+                            </button>
+                          )}
+                        </>
+                      ) : c.status === 'pending' ? (
+                        <>
+                          <button
+                            onClick={async () => { try { await approveContribution(c.id); loadContributions(); } catch (e: any) { alert(e.message); } }}
+                            className="text-xs font-bold px-3 py-1.5 rounded-lg bg-green-500/10 text-green-400 border border-green-500/30 hover:bg-green-500/20 transition-colors"
+                          >
+                            Onayla
+                          </button>
+                          {rejectTarget !== c.id && (
+                            <button onClick={() => { setRejectTarget(c.id); setRejectNote(''); }} className="text-xs font-bold px-3 py-1.5 rounded-lg bg-red-500/10 text-red-400 border border-red-500/30 hover:bg-red-500/20 transition-colors">
+                              Reddet
+                            </button>
+                          )}
+                        </>
+                      ) : null}
+                    </div>
+                  </div>
+                ));
+              })()}
             </div>
           )}
         </div>

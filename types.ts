@@ -82,6 +82,9 @@ export interface VideoSource {
 export interface FansubGroup {
   name: string;
   sources: VideoSource[];
+  contributorUsername?: string;
+  contributorAvatar?: string;
+  contributorId?: string;
 }
 
 export interface Episode {
@@ -221,4 +224,24 @@ export interface Report {
   type: 'profile' | 'comment';
   status: 'pending' | 'resolved' | 'dismissed';
   createdAt: string;
+}
+
+export interface EpisodeContribution {
+  id: string;
+  animeId: string;
+  animeTitle?: string;
+  episodeNumber: number;
+  episodeTitle: string;
+  thumbnail?: string;
+  fansubName: string;
+  sources: VideoSource[];
+  submittedBy: string;
+  submitterUsername?: string;
+  submitterAvatar?: string;
+  status: 'pending' | 'approved' | 'rejected';
+  pendingAction?: 'edit' | 'delete' | null;
+  pendingData?: { fansubName?: string; sources?: VideoSource[]; episodeTitle?: string; thumbnail?: string } | null;
+  adminNote?: string;
+  createdAt: string;
+  updatedAt: string;
 }

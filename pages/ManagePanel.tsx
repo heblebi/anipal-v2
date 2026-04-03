@@ -40,7 +40,7 @@ const ManagePanel = () => {
   const isMod = user?.role === UserRole.MODERATOR;
   const isEditor = user?.role === UserRole.EDITOR;
 
-  const [tab, setTab] = useState<'add' | 'mine' | 'news-add' | 'news-mine'>(isMod ? 'add' : 'news-add');
+  const [tab, setTab] = useState<'add' | 'mine' | 'all' | 'news-add' | 'news-mine'>(isMod ? 'add' : 'news-add');
   const [msg, setMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   useEffect(() => {
@@ -57,6 +57,9 @@ const ManagePanel = () => {
   // ─── Anime state ───────────────────────────────────────────────────────────
   const [animes, setAnimes] = useState<Anime[]>([]);
   const [loadingAnimes, setLoadingAnimes] = useState(false);
+  const [allAnimes, setAllAnimes] = useState<Anime[]>([]);
+  const [loadingAll, setLoadingAll] = useState(false);
+  const [allSearch, setAllSearch] = useState('');
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [editingEp, setEditingEp] = useState<EditingEp | null>(null);
   const [epSaving, setEpSaving] = useState(false);
@@ -77,8 +80,19 @@ const ManagePanel = () => {
     }
   };
 
+  const loadAllAnimes = async () => {
+    setLoadingAll(true);
+    try {
+      const all = await getAnimes({ status: undefined });
+      setAllAnimes(all.filter(a => a.status === 'approved'));
+    } finally {
+      setLoadingAll(false);
+    }
+  };
+
   useEffect(() => {
     if (isMod && tab === 'mine') loadAnimes();
+    if (isMod && tab === 'all') loadAllAnimes();
   }, [tab]);
 
   // Episode row ops
@@ -274,6 +288,7 @@ const ManagePanel = () => {
             <>
               <button className={tabClass('add')} onClick={() => setTab('add')}>+ Anime Ekle</button>
               <button className={tabClass('mine')} onClick={() => setTab('mine')}>Animelerim</button>
+              <button className={tabClass('all')} onClick={() => setTab('all')}>Animeler</button>
             </>
           )}
           {isEditor && (
@@ -394,6 +409,10 @@ const ManagePanel = () => {
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
+                    <button onClick={() => navigate(`/contribute/${anime.id}`)}
+                      className="px-2.5 py-1.5 text-xs font-bold rounded-lg bg-amber-500/10 text-amber-400 border border-amber-500/30 hover:bg-amber-500/20 transition-colors whitespace-nowrap">
+                      + Bölüm
+                    </button>
                     <button onClick={() => setExpandedId(expandedId === anime.id ? null : anime.id)}
                       className="p-2 text-gray-400 hover:text-white">
                       {expandedId === anime.id ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
@@ -421,6 +440,40 @@ const ManagePanel = () => {
                     ))}
                   </div>
                 )}
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* ── Animeler (tüm onaylı animeler) ── */}
+        {tab === 'all' && isMod && (
+          <div className="space-y-4">
+            <input
+              type="text"
+              placeholder="Anime ara..."
+              value={allSearch}
+              onChange={e => setAllSearch(e.target.value)}
+              className="w-full bg-gray-900 border border-gray-700 rounded-xl px-4 py-2.5 text-sm text-white focus:border-amber-500 focus:outline-none"
+            />
+            {loadingAll ? (
+              <div className="text-center py-12 text-gray-500">Yükleniyor...</div>
+            ) : allAnimes.length === 0 ? (
+              <div className="text-center py-12 text-gray-500">Anime bulunamadı.</div>
+            ) : allAnimes
+                .filter(a => a.title.toLowerCase().includes(allSearch.toLowerCase()))
+                .map(anime => (
+              <div key={anime.id} className="bg-[#18181b] border border-gray-800 rounded-xl p-4 flex items-center gap-3">
+                {anime.coverImage && <img src={anime.coverImage} className="w-10 h-14 object-cover rounded-lg flex-shrink-0" alt="" />}
+                <div className="flex-1 min-w-0">
+                  <p className="font-bold text-white text-sm truncate">{anime.title}</p>
+                  <p className="text-xs text-gray-500">{anime.episodes.length} bölüm</p>
+                </div>
+                <button
+                  onClick={() => navigate(`/contribute/${anime.id}`)}
+                  className="px-3 py-1.5 text-xs font-bold rounded-lg bg-amber-500/10 text-amber-400 border border-amber-500/30 hover:bg-amber-500/20 transition-colors whitespace-nowrap flex-shrink-0"
+                >
+                  + Bölüm Ekle
+                </button>
               </div>
             ))}
           </div>

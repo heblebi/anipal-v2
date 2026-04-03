@@ -228,10 +228,15 @@ const Layout = ({ children }: { children?: React.ReactNode }) => {
                         <Button variant="secondary" className="px-3 py-1.5 text-xs h-8">Yönetim</Button>
                     </Link>
                    )}
-                   {(user.role === UserRole.MODERATOR || user.role === UserRole.EDITOR) && (
-                    <Link to="/panel">
-                        <Button variant="secondary" className="px-3 py-1.5 text-xs h-8">Panel</Button>
-                    </Link>
+                   {user.role === UserRole.EDITOR && (
+                    <>
+                      <Link to="/admin/dashboard"><Button variant="secondary" className="px-3 py-1.5 text-xs h-8">Haberler</Button></Link>
+                      <Link to="/contribute"><Button variant="secondary" className="px-3 py-1.5 text-xs h-8">Bölüm Ekle</Button></Link>
+                      <Link to="/my-contributions"><Button variant="secondary" className="px-3 py-1.5 text-xs h-8">Katkılarım</Button></Link>
+                    </>
+                   )}
+                   {user.role === UserRole.MODERATOR && (
+                    <Link to="/panel"><Button variant="secondary" className="px-3 py-1.5 text-xs h-8">Panel</Button></Link>
                    )}
 
                    {/* Notification Bell */}
@@ -556,7 +561,14 @@ const Layout = ({ children }: { children?: React.ReactNode }) => {
                         className="flex items-center py-3 text-base font-bold text-amber-500 border-b border-gray-800"
                       >Yönetim</Link>
                     )}
-                    {(user.role === UserRole.MODERATOR || user.role === UserRole.EDITOR) && (
+                    {user.role === UserRole.EDITOR && (
+                      <>
+                        <Link to="/admin/dashboard" onClick={() => setIsMobileMenuOpen(false)} className="flex items-center py-3 text-base font-bold text-amber-500 border-b border-gray-800">Haberler</Link>
+                        <Link to="/contribute" onClick={() => setIsMobileMenuOpen(false)} className="flex items-center py-3 text-base font-bold text-amber-500 border-b border-gray-800">Bölüm Ekle</Link>
+                        <Link to="/my-contributions" onClick={() => setIsMobileMenuOpen(false)} className="flex items-center py-3 text-base font-bold text-amber-500 border-b border-gray-800">Katkılarım</Link>
+                      </>
+                    )}
+                    {user.role === UserRole.MODERATOR && (
                       <Link to="/panel" onClick={() => setIsMobileMenuOpen(false)}
                         className="flex items-center py-3 text-base font-bold text-amber-500 border-b border-gray-800"
                       >Panel</Link>

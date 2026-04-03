@@ -1,5 +1,5 @@
 import { supabase, USE_SUPABASE } from './supabase';
-import { Anime, AuthResponse, User, UserRole, Episode, Comment, AnimeStatus, SiteStats, Notification, Achievement, NewsItem, AnimeEntry, UserList, VideoSource } from '../types';
+import { Anime, AuthResponse, User, UserRole, Episode, Comment, AnimeStatus, SiteStats, Notification, Achievement, NewsItem, AnimeEntry, UserList, VideoSource, EpisodeContribution } from '../types';
 
 // ─── localStorage backend (test/demo mode) ───────────────────────────────────
 
@@ -1236,4 +1236,196 @@ export const fetchAnimeFromTurkishSite = async (inputUrl: string, _totalEpisodes
     } catch (e: any) {
         return { siteName, fansubs: [], fetchedCount: 0, totalFound: 0, error: e.message };
     }
+};
+
+// ─── Episode Contributions ─────────────────────────────────────────────────────
+
+export const submitContribution = async (
+    userId: string,
+    data: { animeId: string; episodeNumber: number; episodeTitle: string; thumbnail?: string; fansubName: string; sources: { name: string; url: string }[] }
+) => {
+    const { error } = await supabase.from('episode_contributions').insert({
+        anime_id: data.animeId,
+        episode_number: data.episodeNumber,
+        episode_title: data.episodeTitle,
+        thumbnail: data.thumbnail || '',
+        fansub_name: data.fansubName,
+        sources: data.sources,
+        submitted_by: userId,
+        status: 'pending',
+    });
+    if (error) throw new Error(error.message);
+};
+
+export const getMyContributions = async (userId: string): Promise<EpisodeContribution[]> => {
+    const { data, error } = await supabase
+        .from('episode_contributions')
+        .select('*, profiles(username, avatar_url)')
+        .eq('submitted_by', userId)
+        .order('created_at', { ascending: false });
+    if (error) throw new Error(error.message);
+    return (data || []).map((r: any) => ({
+        id: r.id,
+        animeId: r.anime_id,
+        episodeNumber: r.episode_number,
+        episodeTitle: r.episode_title,
+        thumbnail: r.thumbnail,
+        fansubName: r.fansub_name,
+        sources: r.sources || [],
+        submittedBy: r.submitted_by,
+        submitterUsername: r.profiles?.username,
+        status: r.status,
+        pendingAction: r.pending_action,
+        pendingData: r.pending_data,
+        adminNote: r.admin_note,
+        createdAt: r.created_at,
+        updatedAt: r.updated_at,
+    }));
+};
+
+export const getPendingContributions = async (): Promise<EpisodeContribution[]> => {
+    const { data, error } = await supabase
+        .from('episode_contributions')
+        .select('*, profiles(username, avatar_url)')
+        .order('created_at', { ascending: false });
+    if (error) throw new Error(error.message);
+    return (data || []).map((r: any) => ({
+        id: r.id,
+        animeId: r.anime_id,
+        episodeNumber: r.episode_number,
+        episodeTitle: r.episode_title,
+        thumbnail: r.thumbnail,
+        fansubName: r.fansub_name,
+        sources: r.sources || [],
+        submittedBy: r.submitted_by,
+        submitterUsername: r.profiles?.username,
+        submitterAvatar: r.profiles?.avatar_url,
+        status: r.status,
+        pendingAction: r.pending_action,
+        pendingData: r.pending_data,
+        adminNote: r.admin_note,
+        createdAt: r.created_at,
+        updatedAt: r.updated_at,
+    }));
+};
+
+export const approveContribution = async (id: string) => {
+    // Get contribution
+    const { data: contrib, error: fetchErr } = await supabase
+        .from('episode_contributions')
+        .select('*')
+        .eq('id', id)
+        .single();
+    if (fetchErr || !contrib) throw new Error('Katkı bulunamadı');
+
+    // Fetch contributor profile for attribution
+    const { data: profile } = await supabase
+        .from('profiles')
+        .select('username, avatar_url')
+        .eq('id', contrib.submitted_by)
+        .single();
+
+    // Get anime episodes
+    const eps = await getEpisodesRaw(contrib.anime_id);
+    const epIdx = eps.findIndex((e: any) => e.number === contrib.episode_number);
+    const newFansub = {
+        name: contrib.fansub_name,
+        sources: contrib.sources,
+        contributorId: contrib.submitted_by,
+        contributorUsername: profile?.username || null,
+        contributorAvatar: profile?.avatar_url || null,
+    };
+
+    if (epIdx === -1) {
+        // Create new episode
+        eps.push({
+            id: `ep-${Date.now()}`,
+            number: contrib.episode_number,
+            title: contrib.episode_title,
+            thumbnail: contrib.thumbnail || '',
+            videoUrl: contrib.sources?.[0]?.url || '',
+            sources: contrib.sources,
+            fansubs: [newFansub],
+            fansub: contrib.fansub_name,
+            likes: 0,
+        });
+    } else {
+        // Add fansub to existing episode
+        const existing = eps[epIdx];
+        const fansubs = existing.fansubs || [];
+        const fbIdx = fansubs.findIndex((f: any) => f.name === contrib.fansub_name);
+        if (fbIdx === -1) fansubs.push(newFansub);
+        else fansubs[fbIdx] = newFansub;
+        eps[epIdx] = { ...existing, fansubs };
+    }
+
+    await setEpisodes(contrib.anime_id, eps);
+    await supabase.from('episode_contributions').update({ status: 'approved', pending_action: null, pending_data: null, updated_at: new Date().toISOString() }).eq('id', id);
+};
+
+export const rejectContribution = async (id: string, note?: string) => {
+    await supabase.from('episode_contributions').update({ status: 'rejected', admin_note: note || null, updated_at: new Date().toISOString() }).eq('id', id);
+};
+
+export const requestEditContribution = async (id: string, newData: { fansubName?: string; sources?: { name: string; url: string }[]; episodeTitle?: string; thumbnail?: string }) => {
+    const { error } = await supabase.from('episode_contributions').update({
+        pending_action: 'edit',
+        pending_data: newData,
+        updated_at: new Date().toISOString(),
+    }).eq('id', id);
+    if (error) throw new Error(error.message);
+};
+
+export const requestDeleteContribution = async (id: string) => {
+    const { error } = await supabase.from('episode_contributions').update({
+        pending_action: 'delete',
+        updated_at: new Date().toISOString(),
+    }).eq('id', id);
+    if (error) throw new Error(error.message);
+};
+
+export const approveContributionAction = async (id: string) => {
+    const { data: contrib, error } = await supabase.from('episode_contributions').select('*').eq('id', id).single();
+    if (error || !contrib) throw new Error('Katkı bulunamadı');
+
+    if (contrib.pending_action === 'delete') {
+        // Remove fansub from anime episode
+        const eps = await getEpisodesRaw(contrib.anime_id);
+        const epIdx = eps.findIndex((e: any) => e.number === contrib.episode_number);
+        if (epIdx !== -1) {
+            const fansubs = (eps[epIdx].fansubs || []).filter((f: any) => f.name !== contrib.fansub_name);
+            eps[epIdx] = { ...eps[epIdx], fansubs };
+            await setEpisodes(contrib.anime_id, eps);
+        }
+        await supabase.from('episode_contributions').delete().eq('id', id);
+    } else if (contrib.pending_action === 'edit' && contrib.pending_data) {
+        const d = contrib.pending_data;
+        // Update contribution record
+        await supabase.from('episode_contributions').update({
+            fansub_name: d.fansubName ?? contrib.fansub_name,
+            sources: d.sources ?? contrib.sources,
+            episode_title: d.episodeTitle ?? contrib.episode_title,
+            thumbnail: d.thumbnail ?? contrib.thumbnail,
+            pending_action: null,
+            pending_data: null,
+            updated_at: new Date().toISOString(),
+        }).eq('id', id);
+        // Update anime episode if approved
+        if (contrib.status === 'approved') {
+            const eps = await getEpisodesRaw(contrib.anime_id);
+            const epIdx = eps.findIndex((e: any) => e.number === contrib.episode_number);
+            if (epIdx !== -1) {
+                const fansubs = eps[epIdx].fansubs || [];
+                const fbIdx = fansubs.findIndex((f: any) => f.name === contrib.fansub_name);
+                const updated = { name: d.fansubName ?? contrib.fansub_name, sources: d.sources ?? contrib.sources };
+                if (fbIdx !== -1) fansubs[fbIdx] = updated;
+                eps[epIdx] = { ...eps[epIdx], fansubs };
+                await setEpisodes(contrib.anime_id, eps);
+            }
+        }
+    }
+};
+
+export const rejectContributionAction = async (id: string) => {
+    await supabase.from('episode_contributions').update({ pending_action: null, pending_data: null, updated_at: new Date().toISOString() }).eq('id', id);
 };

@@ -340,9 +340,24 @@ const AnimeDetail = () => {
                     <div className="space-y-2">
                         <div className="min-w-0">
                             <h2 className="text-base sm:text-xl font-bold text-white leading-tight">{selectedEpisode.number}. Bölüm: {selectedEpisode.title}</h2>
-                            {selectedFansubName && selectedFansubName !== 'Varsayılan' && (
-                              <span className="text-xs text-amber-500 font-medium">Fansub: {selectedFansubName}</span>
-                            )}
+                            <div className="flex items-center gap-3 flex-wrap mt-0.5">
+                              {selectedFansubName && selectedFansubName !== 'Varsayılan' && (
+                                <span className="text-xs text-amber-500 font-medium">Fansub: {selectedFansubName}</span>
+                              )}
+                              {(() => {
+                                const fb = getEpFansubs(selectedEpisode).find(f => f.name === selectedFansubName);
+                                if (!fb?.contributorUsername) return null;
+                                return (
+                                  <Link to={`/profile/${fb.contributorId}`} className="flex items-center gap-1.5 group" title={`${fb.contributorUsername} tarafından eklendi`}>
+                                    {fb.contributorAvatar
+                                      ? <img src={fb.contributorAvatar} className="w-4 h-4 rounded-full object-cover opacity-60 group-hover:opacity-100 transition-opacity" alt="" />
+                                      : <div className="w-4 h-4 rounded-full bg-gray-700 flex items-center justify-center opacity-60 group-hover:opacity-100 transition-opacity"><span className="text-[8px] text-gray-400">{fb.contributorUsername[0].toUpperCase()}</span></div>
+                                    }
+                                    <span className="text-[11px] text-gray-500 group-hover:text-gray-300 transition-colors">{fb.contributorUsername}</span>
+                                  </Link>
+                                );
+                              })()}
+                            </div>
                         </div>
                         <div className="flex gap-2">
                             <Button
