@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate, useSearchParams, Link } from 'react-router-dom';
-import { getAnimeById, toggleLikeEpisode, toggleWatchlist, markEpisodeWatched, unmarkEpisodeWatched, saveAnimeEntry, getAnimeEntry, grantWatchXP, getUserLists, createUserList, addAnimeToList, removeAnimeFromList, updateListVisibility, deleteUserList } from '../services/mockBackend';
+import { getAnimeById, toggleLikeEpisode, toggleWatchlist, markEpisodeWatched, unmarkEpisodeWatched, saveAnimeEntry, getAnimeEntry, grantWatchXP, getUserLists, createUserList, addAnimeToList, removeAnimeFromList, updateListVisibility, deleteUserList, getMiniProfiles } from '../services/mockBackend';
 import { useAuth } from '../context/AuthContext';
 import { Anime, Episode, VideoSource, FansubGroup, AnimeWatchStatus } from '../types';
 import VideoPlayer from '../components/VideoPlayer';
@@ -41,6 +41,9 @@ const AnimeDetail = () => {
   const [playerStarted, setPlayerStarted] = useState(false);
   const [xpGranted, setXpGranted] = useState(false);
 
+  // Mini profiles map: userId -> { username, avatar }
+  const [miniProfiles, setMiniProfiles] = useState<Map<string, { username: string; avatar: string }>>(new Map());
+
   const commentsRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -58,6 +61,11 @@ const AnimeDetail = () => {
             setSelectedFansubName(fansubs[0].name);
             setSelectedSource(fansubs[0].sources[0] || null);
           }
+          // Collect all user IDs to fetch profiles for
+          const ids: string[] = [];
+          if (data.uploadedBy) ids.push(data.uploadedBy);
+          data.episodes.forEach(ep => { if (ep.addedBy) ids.push(ep.addedBy); });
+          getMiniProfiles(ids).then(setMiniProfiles).catch(() => {});
         }
       }
       setLoading(false);
@@ -375,15 +383,30 @@ const AnimeDetail = () => {
                     {/* Katkıda bulunan */}
                     {(() => {
                       const fb = getEpFansubs(selectedEpisode).find(f => f.name === selectedFansubName);
-                      if (!fb?.contributorUsername) return null;
+                      // Priority: fansub contributor > episode addedBy > anime uploadedBy
+                      let userId: string | undefined;
+                      let username: string | undefined;
+                      let avatar: string | undefined;
+                      if (fb?.contributorUsername) {
+                        userId = fb.contributorId;
+                        username = fb.contributorUsername;
+                        avatar = fb.contributorAvatar;
+                      } else {
+                        const epAddedBy = selectedEpisode.addedBy || anime?.uploadedBy;
+                        if (epAddedBy) {
+                          const p = miniProfiles.get(epAddedBy);
+                          if (p) { userId = epAddedBy; username = p.username; avatar = p.avatar; }
+                        }
+                      }
+                      if (!username) return null;
                       return (
-                        <Link to={`/profile/${fb.contributorId}`} className="flex items-center gap-3 group w-fit pt-1">
-                          {fb.contributorAvatar
-                            ? <img src={fb.contributorAvatar} className="w-9 h-9 rounded-full object-cover ring-2 ring-gray-700 group-hover:ring-amber-500 transition-all" alt="" />
-                            : <div className="w-9 h-9 rounded-full bg-gray-700 ring-2 ring-gray-600 group-hover:ring-amber-500 transition-all flex items-center justify-center"><span className="text-sm text-gray-300 font-bold">{fb.contributorUsername[0].toUpperCase()}</span></div>
+                        <Link to={`/profile/${userId}`} className="flex items-center gap-3 group w-fit pt-1">
+                          {avatar
+                            ? <img src={avatar} className="w-9 h-9 rounded-full object-cover ring-2 ring-gray-700 group-hover:ring-amber-500 transition-all" alt="" />
+                            : <div className="w-9 h-9 rounded-full bg-gray-700 ring-2 ring-gray-600 group-hover:ring-amber-500 transition-all flex items-center justify-center"><span className="text-sm text-gray-300 font-bold">{username[0].toUpperCase()}</span></div>
                           }
                           <div>
-                            <p className="text-sm font-semibold text-white group-hover:text-amber-400 transition-colors leading-tight">{fb.contributorUsername}</p>
+                            <p className="text-sm font-semibold text-white group-hover:text-amber-400 transition-colors leading-tight">{username}</p>
                             <p className="text-xs text-gray-500">Tarafından Eklendi</p>
                           </div>
                         </Link>

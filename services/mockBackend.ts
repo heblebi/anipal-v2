@@ -1238,6 +1238,13 @@ export const fetchAnimeFromTurkishSite = async (inputUrl: string, _totalEpisodes
     }
 };
 
+export const getMiniProfiles = async (ids: string[]): Promise<Map<string, { username: string; avatar: string }>> => {
+    const unique = [...new Set(ids.filter(Boolean))];
+    if (!unique.length) return new Map();
+    const { data } = await supabase.from('profiles').select('id, username, avatar_url').in('id', unique);
+    return new Map((data || []).map((p: any) => [p.id, { username: p.username, avatar: p.avatar_url || '' }]));
+};
+
 // ─── Episode Contributions ─────────────────────────────────────────────────────
 
 export const submitContribution = async (

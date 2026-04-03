@@ -138,6 +138,7 @@ const AddEpisodePage = () => {
         fansubs: r.fansubs.map(f => ({ name: f.name, sources: f.sources.filter(s => s.url).map(s => ({ name: s.name, url: s.url })) })).filter(f => f.sources.length > 0),
         thumbnail: r.thumbnail,
         fansub: r.fansubs[0]?.name || '',
+        addedBy: user?.id,
       }));
       await addEpisodes(animeId, eps);
       setMsg(`${eps.length} bölüm başarıyla eklendi!`);

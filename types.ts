@@ -97,6 +97,7 @@ export interface Episode {
   likes: number;
   fansub?: string;
   thumbnail?: string;
+  addedBy?: string; // user ID of whoever added this episode
 }
 
 export enum AnimeStatus {
