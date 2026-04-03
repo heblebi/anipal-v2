@@ -49,7 +49,7 @@ const ContributePage = () => {
   useEffect(() => {
     if (isLoading) return;
     if (!user) { navigate('/login'); return; }
-    if (user.role !== UserRole.EDITOR && user.role !== UserRole.ADMIN) {
+    if (user.role !== UserRole.EDITOR && user.role !== UserRole.ADMIN && user.role !== UserRole.MODERATOR) {
       navigate('/');
       return;
     }
