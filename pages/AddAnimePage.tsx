@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { createAnimeWithEpisodes, fetchAniListData, fetchAllSeasons } from '../services/mockBackend';
+import { createAnimeWithEpisodes, fetchAniListData, fetchAllSeasons, fetchMALEpisodes } from '../services/mockBackend';
 
 interface EmbedResult {
   source: string;
@@ -65,6 +65,10 @@ const AddAnimePage = () => {
   const [epFetchLoading, setEpFetchLoading] = useState(false);
   const [msg, setMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
+  // Per-section MAL fetch
+  const [secMalId, setSecMalId] = useState<Record<string, string>>({});
+  const [secMalLoading, setSecMalLoading] = useState<Record<string, boolean>>({});
+
   // Per-episode embed fetching
   const [rowEmbedUrl, setRowEmbedUrl] = useState<Record<string, string>>({});
   const [rowEmbedLoading, setRowEmbedLoading] = useState<Record<string, boolean>>({});
@@ -118,6 +122,29 @@ const AddAnimePage = () => {
       setMsg({ type: 'error', text: 'Bölüm çekilirken hata oluştu.' });
     } finally {
       setEpFetchLoading(false);
+    }
+  };
+
+  const handleFetchSectionEpisodes = async (sId: string) => {
+    const idStr = (secMalId[sId] || '').trim();
+    const id = parseInt(idStr);
+    if (!id) return;
+    setSecMalLoading(p => ({ ...p, [sId]: true }));
+    try {
+      const eps = await fetchMALEpisodes(id);
+      if (!eps.length) { setMsg({ type: 'error', text: 'Bu AniList ID için bölüm bulunamadı.' }); return; }
+      setSeasonSections(prev => prev.map(s => s.id !== sId ? s : {
+        ...s,
+        episodes: eps.map(ep => {
+          const rowId = `ep-${ep.number}-${Date.now()}-${Math.random()}`;
+          return { id: rowId, number: String(ep.number), title: ep.title, thumbnail: ep.thumbnail, fansubs: [newFansubRow(rowId)] };
+        }),
+      }));
+      setMsg({ type: 'success', text: `${eps.length} bölüm çekildi!` });
+    } catch {
+      setMsg({ type: 'error', text: 'Bölüm çekilirken hata oluştu.' });
+    } finally {
+      setSecMalLoading(p => ({ ...p, [sId]: false }));
     }
   };
 
@@ -338,6 +365,26 @@ const AddAnimePage = () => {
                 <span className="text-xs text-gray-500 font-normal">({sec.episodes.length} bölüm)</span>
               </h2>
               <div className="flex items-center gap-2 flex-wrap">
+                {/* Per-section MAL fetch */}
+                <div className="flex items-center gap-1">
+                  <input
+                    type="number"
+                    placeholder="AniList ID"
+                    value={secMalId[sec.id] || ''}
+                    onChange={e => setSecMalId(p => ({ ...p, [sec.id]: e.target.value }))}
+                    onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), handleFetchSectionEpisodes(sec.id))}
+                    className="w-28 bg-gray-800 border border-gray-700 rounded px-2 py-1 text-white text-xs focus:border-amber-500 focus:outline-none"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => handleFetchSectionEpisodes(sec.id)}
+                    disabled={secMalLoading[sec.id] || !secMalId[sec.id]?.trim()}
+                    className="flex items-center gap-1 px-2 py-1 bg-blue-700 hover:bg-blue-600 disabled:opacity-50 text-white text-xs font-bold rounded transition-colors"
+                  >
+                    {secMalLoading[sec.id] ? <Loader2 size={11} className="animate-spin" /> : <Sparkles size={11} />}
+                    Çek
+                  </button>
+                </div>
                 {sec.number === 1 && anilistId && (
                   <Button
                     type="button"

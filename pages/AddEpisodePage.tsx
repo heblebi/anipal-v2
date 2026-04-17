@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { getAnimes, addEpisodes, fetchAllSeasons } from '../services/mockBackend';
+import { getAnimes, addEpisodes, fetchAllSeasons, fetchMALEpisodes } from '../services/mockBackend';
 import { UserRole, Anime } from '../types';
 import Button from '../components/Button';
 import { Plus, Trash2, ArrowLeft, Globe, CheckCircle2, AlertCircle, Loader2, X, Layers, Download } from 'lucide-react';
@@ -52,6 +52,8 @@ const AddEpisodePage = () => {
   const [msg, setMsg] = useState('');
   const [anilistId, setAnilistId] = useState('');
   const [malFetchLoading, setMalFetchLoading] = useState(false);
+  const [secMalId, setSecMalId] = useState<Record<string, string>>({});
+  const [secMalLoading, setSecMalLoading] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     if (isLoading) return;
@@ -97,6 +99,31 @@ const AddEpisodePage = () => {
       setMsg('Hata: Bölüm çekilirken hata oluştu.');
     } finally {
       setMalFetchLoading(false);
+    }
+  };
+
+  const handleFetchSectionEpisodes = async (sId: string) => {
+    const id = parseInt((secMalId[sId] || '').trim());
+    if (!id) return;
+    setSecMalLoading(p => ({ ...p, [sId]: true }));
+    try {
+      const eps = await fetchMALEpisodes(id);
+      if (!eps.length) { setMsg('Hata: Bu AniList ID için bölüm bulunamadı.'); return; }
+      setSeasonSections(prev => prev.map(s => s.id !== sId ? s : {
+        ...s,
+        episodes: eps.map(ep => ({
+          id: `ep-${ep.number}-${Date.now()}-${Math.random()}`,
+          number: String(ep.number),
+          title: ep.title,
+          thumbnail: ep.thumbnail,
+          fansubs: [newFansub()],
+        })),
+      }));
+      setMsg(`${eps.length} bölüm çekildi! Şimdi linkleri ekleyebilirsin.`);
+    } catch {
+      setMsg('Hata: Bölüm çekilirken hata oluştu.');
+    } finally {
+      setSecMalLoading(p => ({ ...p, [sId]: false }));
     }
   };
 
@@ -298,16 +325,36 @@ const AddEpisodePage = () => {
                     <span className="text-xs bg-amber-500/10 text-amber-500 border border-amber-700/30 px-2 py-0.5 rounded-full">Mevcut</span>
                   )}
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap justify-end">
+                  {/* Per-section MAL fetch */}
+                  <div className="flex items-center gap-1">
+                    <input
+                      type="number"
+                      placeholder="AniList ID"
+                      value={secMalId[sec.id] || ''}
+                      onChange={e => setSecMalId(p => ({ ...p, [sec.id]: e.target.value }))}
+                      onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), handleFetchSectionEpisodes(sec.id))}
+                      className="w-28 bg-gray-800 border border-gray-700 rounded px-2 py-1 text-white text-xs focus:border-amber-500 focus:outline-none"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => handleFetchSectionEpisodes(sec.id)}
+                      disabled={secMalLoading[sec.id] || !secMalId[sec.id]?.trim()}
+                      className="flex items-center gap-1 px-2 py-1 bg-blue-700 hover:bg-blue-600 disabled:opacity-50 text-white text-xs font-bold rounded transition-colors"
+                    >
+                      {secMalLoading[sec.id] ? <Loader2 size={11} className="animate-spin" /> : <Download size={11} />}
+                      Çek
+                    </button>
+                  </div>
                   {/* Season number edit */}
                   <div className="flex items-center gap-1">
-                    <label className="text-xs text-gray-500">Sezon No:</label>
+                    <label className="text-xs text-gray-500">No:</label>
                     <input
                       type="number"
                       min="1"
                       value={sec.number}
                       onChange={e => setSeasonSections(prev => prev.map(s => s.id === sec.id ? { ...s, number: parseInt(e.target.value) || 1 } : s))}
-                      className="w-14 bg-gray-800 border border-gray-700 rounded px-2 py-1 text-white text-xs focus:border-amber-500 focus:outline-none"
+                      className="w-12 bg-gray-800 border border-gray-700 rounded px-2 py-1 text-white text-xs focus:border-amber-500 focus:outline-none"
                     />
                   </div>
                   {seasonSections.length > 1 && (
