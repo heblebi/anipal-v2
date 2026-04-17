@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { getAnimes, addEpisodes } from '../services/mockBackend';
+import { getAnimes, addEpisodes, fetchAllSeasons } from '../services/mockBackend';
 import { UserRole, Anime } from '../types';
 import Button from '../components/Button';
-import { Plus, Trash2, ArrowLeft, Globe, CheckCircle2, AlertCircle, Loader2, X, Layers } from 'lucide-react';
+import { Plus, Trash2, ArrowLeft, Globe, CheckCircle2, AlertCircle, Loader2, X, Layers, Download } from 'lucide-react';
 
 interface SourceRow { id: string; name: string; url: string; }
 interface FansubRow { id: string; name: string; sources: SourceRow[]; }
@@ -50,6 +50,8 @@ const AddEpisodePage = () => {
   const [fetchStatus, setFetchStatus] = useState<Record<string, 'ok' | 'error' | null>>({});
   const [fetchUrl, setFetchUrl] = useState<Record<string, string>>({});
   const [msg, setMsg] = useState('');
+  const [anilistId, setAnilistId] = useState('');
+  const [malFetchLoading, setMalFetchLoading] = useState(false);
 
   useEffect(() => {
     if (isLoading) return;
@@ -65,6 +67,38 @@ const AddEpisodePage = () => {
       setSeasonSections([newSeasonSection(defaultSeason)]);
     });
   }, [isLoading, animeId]);
+
+  const handleFetchAllSeasons = async () => {
+    const id = parseInt(anilistId.trim());
+    if (!id) return;
+    setMalFetchLoading(true);
+    setMsg('');
+    try {
+      const seasons = await fetchAllSeasons(id);
+      if (!seasons.length || seasons.every(s => s.episodes.length === 0)) {
+        setMsg('Hata: MAL\'dan bölüm verisi bulunamadı. Manuel ekleyebilirsin.');
+        return;
+      }
+      const newSections: SeasonSection[] = seasons.map(s => ({
+        id: `season-${s.season}-${Date.now()}`,
+        number: s.season,
+        episodes: s.episodes.map(ep => ({
+          id: `ep-s${s.season}-${ep.number}-${Date.now()}-${Math.random()}`,
+          number: String(ep.number),
+          title: ep.title,
+          thumbnail: ep.thumbnail,
+          fansubs: [newFansub()],
+        })),
+      }));
+      setSeasonSections(newSections);
+      const totalEps = seasons.reduce((t, s) => t + s.episodes.length, 0);
+      setMsg(`${seasons.length} sezon, ${totalEps} bölüm çekildi! Şimdi linkleri ekleyebilirsin.`);
+    } catch {
+      setMsg('Hata: Bölüm çekilirken hata oluştu.');
+    } finally {
+      setMalFetchLoading(false);
+    }
+  };
 
   // Season helpers
   const addSeason = () => setSeasonSections(prev => [...prev, newSeasonSection(prev.length > 0 ? Math.max(...prev.map(s => s.number)) + 1 : 1)]);
@@ -216,6 +250,31 @@ const AddEpisodePage = () => {
             })}
           </div>
         )}
+
+        {/* MAL / AniList Fetch */}
+        <div className="bg-gray-900/50 border border-gray-800 rounded-xl p-3 space-y-2">
+          <p className="text-xs text-gray-500 font-bold uppercase flex items-center gap-1.5"><Download size={12} className="text-amber-500" /> MAL'den Bölüm Çek</p>
+          <div className="flex gap-2">
+            <input
+              type="number"
+              placeholder="AniList ID (anilist.co/anime/...)"
+              value={anilistId}
+              onChange={e => setAnilistId(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), handleFetchAllSeasons())}
+              className="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:border-amber-500 focus:outline-none"
+            />
+            <button
+              type="button"
+              onClick={handleFetchAllSeasons}
+              disabled={malFetchLoading || !anilistId.trim()}
+              className="flex items-center gap-2 px-4 py-2 bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-black font-bold text-sm rounded-lg transition-colors flex-shrink-0"
+            >
+              {malFetchLoading ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
+              Tüm Sezonları Çek
+            </button>
+          </div>
+          <p className="text-xs text-gray-600">Tüm sezonları çeker ve mevcut bölüm listesini günceller. Sadece başlık/thumbnail gelir, linkler manuel girilir.</p>
+        </div>
 
         {msg && (
           <div className={`p-3 rounded-xl text-sm font-medium border ${msg.startsWith('Hata') ? 'bg-red-900/20 border-red-800 text-red-400' : 'bg-green-900/20 border-green-800 text-green-400'}`}>
