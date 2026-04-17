@@ -3,7 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import Button from './Button';
 import { UserRole, Notification } from '../types';
-import { LogOut, Menu, X, Settings, User as UserIcon, Search, Bell, ChevronDown, Send, MessageCircle, Users, UserCheck, UserPlus, Check } from 'lucide-react';
+import { LogOut, X, Settings, User as UserIcon, Search, Bell, ChevronDown, Send, MessageCircle, Users, UserCheck, UserPlus, Check, Home, Newspaper, Compass, Trophy } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useSiteSettings } from '../context/SiteSettingsContext';
 import { getNotifications, markNotificationsAsRead, clearNotifications, getOnlineStatuses } from '../services/mockBackend';
@@ -16,6 +16,7 @@ const Layout = ({ children }: { children?: React.ReactNode }) => {
   const { settings: siteSettings } = useSiteSettings();
   const navigate = useNavigate();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false);
+  const [showMobileProfile, setShowMobileProfile] = React.useState(false);
   const [scrolled, setScrolled] = useState(false);
 
   // Notification State
@@ -467,172 +468,206 @@ const Layout = ({ children }: { children?: React.ReactNode }) => {
               )}
             </div>
 
-            {/* Mobile: bell + chat + menu */}
+            {/* Mobile: bildirim + profil dairesi */}
             <div className="md:hidden flex items-center gap-1">
-              {isAuthenticated && user && (
+              {isAuthenticated && user ? (
                 <>
+                  {/* Bildirim zili */}
                   <div className="relative" ref={mobileNotifRef}>
-                    <button onClick={handleNotifClick} className="relative p-3 text-gray-300 hover:text-white">
-                      <Bell size={20} />
+                    <button onClick={handleNotifClick} className="relative p-2.5 text-gray-300 hover:text-white">
+                      <Bell size={22} />
                       {unreadCount > 0 && (
-                        <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full animate-pulse border border-[#0f0f10]"></span>
+                        <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full animate-pulse border border-[#0f0f10]"></span>
                       )}
                     </button>
-                    {/* Mobile notification dropdown */}
                     {showNotifs && (
                       <div className="fixed top-16 left-4 right-4 bg-[#18181b] border border-gray-800 rounded-xl shadow-2xl overflow-hidden animate-in fade-in slide-in-from-top-2 z-50">
                         <div className="p-3 border-b border-gray-800 flex items-center justify-between">
                           <span className="font-bold text-sm text-gray-300">Bildirimler</span>
                           {notifications.length > 0 && (
-                            <button
-                              onClick={async () => {
-                                if (!user) return;
-                                await clearNotifications(user.id);
-                                setNotifications([]);
-                                setUnreadCount(0);
-                              }}
-                              className="text-[11px] text-gray-500 hover:text-red-400 transition-colors font-medium"
-                            >
-                              Tümünü Temizle
-                            </button>
+                            <button onClick={async () => { if (!user) return; await clearNotifications(user.id); setNotifications([]); setUnreadCount(0); }}
+                              className="text-[11px] text-gray-500 hover:text-red-400 transition-colors font-medium">Tümünü Temizle</button>
                           )}
                         </div>
                         <div className="max-h-72 overflow-y-auto custom-scrollbar">
-                          {notifications.length > 0 ? (
-                            notifications.map(notif => {
-                              const notifLink = notif.type === 'FOLLOW' ? '/social?tab=requests' : notif.type === 'ANIME_REQUEST' ? '/request' : null;
-                              const inner = (
-                                <div className="flex items-start gap-3">
-                                  <div className="text-xl">
-                                    {notif.type === 'LEVEL_UP' && '🆙'}
-                                    {notif.type === 'BADGE_EARNED' && '🏆'}
-                                    {notif.type === 'NEW_EPISODE' && '📺'}
-                                    {notif.type === 'FOLLOW' && '👤'}
-                                    {notif.type === 'ANIME_REQUEST' && '🎌'}
-                                  </div>
-                                  <div>
-                                    <p className="text-xs font-bold text-amber-500 mb-0.5">{notif.title}</p>
-                                    <p className="text-xs text-gray-300 leading-tight">{notif.message}</p>
-                                    <p className="text-[10px] text-gray-600 mt-1">{new Date(notif.createdAt).toLocaleTimeString()}</p>
-                                  </div>
-                                </div>
-                              );
-                              return notifLink ? (
-                                <Link key={notif.id} to={notifLink} onClick={() => setShowNotifs(false)} className={`block p-3 border-b border-gray-800/50 hover:bg-gray-800 transition-colors cursor-pointer ${!notif.isRead ? 'bg-amber-500/5' : ''}`}>{inner}</Link>
-                              ) : (
-                                <div key={notif.id} className={`p-3 border-b border-gray-800/50 hover:bg-gray-800 transition-colors ${!notif.isRead ? 'bg-amber-500/5' : ''}`}>{inner}</div>
-                              );
-                            })
-                          ) : (
-                            <div className="p-4 text-center text-xs text-gray-500">Bildirim yok.</div>
-                          )}
+                          {notifications.length > 0 ? notifications.map(notif => {
+                            const notifLink = notif.type === 'FOLLOW' ? '/social?tab=requests' : notif.type === 'ANIME_REQUEST' ? '/request' : null;
+                            const inner = (
+                              <div className="flex items-start gap-3">
+                                <div className="text-xl">{notif.type === 'LEVEL_UP' && '🆙'}{notif.type === 'BADGE_EARNED' && '🏆'}{notif.type === 'NEW_EPISODE' && '📺'}{notif.type === 'FOLLOW' && '👤'}{notif.type === 'ANIME_REQUEST' && '🎌'}</div>
+                                <div><p className="text-xs font-bold text-amber-500 mb-0.5">{notif.title}</p><p className="text-xs text-gray-300 leading-tight">{notif.message}</p></div>
+                              </div>
+                            );
+                            return notifLink ? (
+                              <Link key={notif.id} to={notifLink} onClick={() => setShowNotifs(false)} className={`block p-3 border-b border-gray-800/50 hover:bg-gray-800 transition-colors ${!notif.isRead ? 'bg-amber-500/5' : ''}`}>{inner}</Link>
+                            ) : (
+                              <div key={notif.id} className={`p-3 border-b border-gray-800/50 ${!notif.isRead ? 'bg-amber-500/5' : ''}`}>{inner}</div>
+                            );
+                          }) : <div className="p-4 text-center text-xs text-gray-500">Bildirim yok.</div>}
                         </div>
                       </div>
                     )}
                   </div>
-                  <button onClick={() => { setShowChat(true); setIsMobileMenuOpen(false); }} className="relative p-3 text-gray-300 hover:text-white">
-                    <MessageCircle size={20} />
-                    {unreadMsgs > 0 && (
-                      <span className="absolute top-2 right-2 w-2 h-2 bg-amber-500 rounded-full border border-[#0f0f10]"></span>
-                    )}
+
+                  {/* Profil dairesi */}
+                  <button onClick={() => setShowMobileProfile(true)} className="relative ml-1 mr-1">
+                    <img
+                      src={user.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.username}`}
+                      alt=""
+                      className="w-9 h-9 rounded-full border-2 border-amber-500/60 object-cover"
+                    />
                   </button>
                 </>
+              ) : (
+                <Link to="/login" className="text-sm font-bold text-amber-500 px-3 py-1.5">Giriş Yap</Link>
               )}
-              <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="text-white p-3">
-                {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
-              </button>
             </div>
           </div>
         </div>
+      </nav>
 
-        {/* Mobile Menu */}
-        {isMobileMenuOpen && (
-          <div className="md:hidden bg-[#18181b] border-b border-gray-800 animate-in slide-in-from-top-5 duration-200 absolute w-full">
-            <div className="px-5 pt-4 pb-6 space-y-1">
-              {[
-                { to: '/', label: 'Ana Sayfa' },
-                { to: '/news', label: 'Haberler' },
-                { to: '/explore', label: 'Keşfet' },
-                { to: '/leaderboard', label: 'Sıralama' },
-              ].map(({ to, label }) => (
-                <Link key={to} to={to} onClick={() => setIsMobileMenuOpen(false)}
-                  className={`flex items-center py-3 text-base font-bold border-b border-gray-800 ${location.pathname === to ? 'text-amber-500' : 'text-gray-300'}`}
-                >{label}</Link>
-              ))}
-              <div className="pt-2">
-                {isAuthenticated && user ? (
-                  <>
-                    {user.role === UserRole.ADMIN && (
-                      <Link to="/admin" onClick={() => setIsMobileMenuOpen(false)}
-                        className="flex items-center py-3 text-base font-bold text-amber-500 border-b border-gray-800"
-                      >Yönetim</Link>
-                    )}
-                    {user.role === UserRole.EDITOR && (
-                      <>
-                        <Link to="/admin/dashboard" onClick={() => setIsMobileMenuOpen(false)} className="flex items-center py-3 text-base font-bold text-amber-500 border-b border-gray-800">Haberler</Link>
-                        <Link to="/contribute" onClick={() => setIsMobileMenuOpen(false)} className="flex items-center py-3 text-base font-bold text-amber-500 border-b border-gray-800">Bölüm Ekle</Link>
-                      </>
-                    )}
-                    {user.role === UserRole.MODERATOR && (
-                      <Link to="/panel" onClick={() => setIsMobileMenuOpen(false)}
-                        className="flex items-center py-3 text-base font-bold text-amber-500 border-b border-gray-800"
-                      >Panel</Link>
-                    )}
-                    <Link to="/profile" onClick={() => setIsMobileMenuOpen(false)}
-                      className="flex items-center gap-3 py-3 border-b border-gray-800"
-                    >
-                      <img src={user.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.username}`}
-                        className="w-9 h-9 rounded-full border border-gray-700 object-cover" alt="" />
-                      <div>
-                        <div className="text-white font-bold text-sm">{user.username}</div>
-                        <div className="text-amber-500 text-xs">Seviye {user.level}</div>
-                      </div>
-                    </Link>
-                    <Link to="/social" onClick={() => setIsMobileMenuOpen(false)}
-                      className="flex items-center gap-2 py-3 text-gray-400 border-b border-gray-800 text-sm"
-                    >
-                      <Users size={16} /> Arkadaşlar
-                      {pendingReqs.length > 0 && <span className="ml-auto bg-amber-500 text-black text-[10px] font-black px-1.5 py-0.5 rounded-full">{pendingReqs.length}</span>}
-                    </Link>
-                    <button onClick={() => { setShowChat(true); setIsMobileMenuOpen(false); }}
-                      className="flex items-center gap-2 py-3 text-gray-400 border-b border-gray-800 text-sm w-full"
-                    >
-                      <MessageCircle size={16} /> Mesajlar
-                      {unreadMsgs > 0 && <span className="ml-auto bg-amber-500 text-black text-[10px] font-black px-1.5 py-0.5 rounded-full">{unreadMsgs}</span>}
-                    </button>
-                    <Link to="/settings" onClick={() => setIsMobileMenuOpen(false)}
-                      className="flex items-center gap-2 py-3 text-gray-400 border-b border-gray-800 text-sm"
-                    ><Settings size={16} /> Ayarlar</Link>
-                    <Link to="/request" onClick={() => setIsMobileMenuOpen(false)}
-                      className="flex items-center gap-2 py-3 text-gray-400 border-b border-gray-800 text-sm"
-                    ><Send size={16} /> İstek / Öneri</Link>
-                    <button onClick={handleLogout}
-                      className="flex items-center gap-2 py-3 text-red-400 text-sm font-bold w-full"
-                    ><LogOut size={16} /> Çıkış Yap</button>
-                  </>
-                ) : (
-                  <div className="flex gap-3 pt-2">
-                    <Link to="/login" onClick={() => setIsMobileMenuOpen(false)}
-                      className="flex-1 text-center py-3 text-sm font-bold text-gray-300 border border-gray-700 rounded-xl"
-                    >Giriş Yap</Link>
-                    <Link to="/register" onClick={() => setIsMobileMenuOpen(false)}
-                      className="flex-1 text-center py-3 text-sm font-bold text-black bg-amber-500 rounded-xl"
-                    >Kayıt Ol</Link>
-                  </div>
+      {/* ── Mobil Profil Çekmecesi ── */}
+      {showMobileProfile && (
+        <div className="md:hidden fixed inset-0 z-[60] flex flex-col justify-end">
+          {/* Arka plan overlay */}
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setShowMobileProfile(false)} />
+          {/* Çekmece */}
+          <div className="relative bg-[#18181b] border-t border-gray-700 rounded-t-2xl animate-in slide-in-from-bottom-4 duration-200 max-h-[80vh] overflow-y-auto">
+            {/* Tutamaç */}
+            <div className="flex justify-center pt-3 pb-1">
+              <div className="w-10 h-1 bg-gray-700 rounded-full" />
+            </div>
+
+            {/* Kullanıcı başlık */}
+            <div className="flex items-center gap-3 px-5 py-4 border-b border-gray-800">
+              <img
+                src={user?.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user?.username}`}
+                alt=""
+                className="w-14 h-14 rounded-full border-2 border-amber-500/50 object-cover flex-shrink-0"
+              />
+              <div className="min-w-0">
+                <p className="font-black text-white text-base truncate">{user?.displayName || user?.username}</p>
+                <p className="text-xs text-gray-500">@{user?.username}</p>
+                <p className="text-xs text-amber-500 font-bold">Seviye {user?.level} · {user?.xp} XP</p>
+              </div>
+              <button onClick={() => setShowMobileProfile(false)} className="ml-auto text-gray-500 hover:text-white p-1 flex-shrink-0">
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Menü öğeleri */}
+            <div className="py-2">
+              {user?.role === UserRole.ADMIN && (
+                <Link to="/admin" onClick={() => setShowMobileProfile(false)}
+                  className="flex items-center gap-4 px-5 py-3.5 text-amber-400 font-bold text-sm hover:bg-gray-800 active:bg-gray-700 transition-colors">
+                  <Settings size={18} /> Yönetim Paneli
+                </Link>
+              )}
+              {user?.role === UserRole.EDITOR && (
+                <>
+                  <Link to="/admin/dashboard" onClick={() => setShowMobileProfile(false)}
+                    className="flex items-center gap-4 px-5 py-3.5 text-amber-400 font-bold text-sm hover:bg-gray-800 active:bg-gray-700 transition-colors">
+                    <Newspaper size={18} /> Haber Paneli
+                  </Link>
+                  <Link to="/contribute" onClick={() => setShowMobileProfile(false)}
+                    className="flex items-center gap-4 px-5 py-3.5 text-amber-400 font-bold text-sm hover:bg-gray-800 active:bg-gray-700 transition-colors">
+                    <Send size={18} /> Bölüm Ekle
+                  </Link>
+                </>
+              )}
+              {user?.role === UserRole.MODERATOR && (
+                <Link to="/panel" onClick={() => setShowMobileProfile(false)}
+                  className="flex items-center gap-4 px-5 py-3.5 text-amber-400 font-bold text-sm hover:bg-gray-800 active:bg-gray-700 transition-colors">
+                  <Settings size={18} /> Panel
+                </Link>
+              )}
+
+              <Link to="/profile" onClick={() => setShowMobileProfile(false)}
+                className="flex items-center gap-4 px-5 py-3.5 text-gray-200 text-sm hover:bg-gray-800 active:bg-gray-700 transition-colors">
+                <UserIcon size={18} className="text-gray-400" /> Profilim
+              </Link>
+
+              <Link to="/leaderboard" onClick={() => setShowMobileProfile(false)}
+                className="flex items-center gap-4 px-5 py-3.5 text-gray-200 text-sm hover:bg-gray-800 active:bg-gray-700 transition-colors">
+                <Trophy size={18} className="text-gray-400" /> Sıralama
+              </Link>
+
+              <Link to="/social" onClick={() => setShowMobileProfile(false)}
+                className="flex items-center gap-4 px-5 py-3.5 text-gray-200 text-sm hover:bg-gray-800 active:bg-gray-700 transition-colors">
+                <Users size={18} className="text-gray-400" />
+                <span>Arkadaşlar</span>
+                {pendingReqs.length > 0 && (
+                  <span className="ml-auto bg-amber-500 text-black text-[10px] font-black px-1.5 py-0.5 rounded-full">{pendingReqs.length}</span>
                 )}
+              </Link>
+
+              <button onClick={() => { setShowChat(true); setShowMobileProfile(false); }}
+                className="w-full flex items-center gap-4 px-5 py-3.5 text-gray-200 text-sm hover:bg-gray-800 active:bg-gray-700 transition-colors">
+                <MessageCircle size={18} className="text-gray-400" />
+                <span>Mesajlar</span>
+                {unreadMsgs > 0 && (
+                  <span className="ml-auto bg-amber-500 text-black text-[10px] font-black px-1.5 py-0.5 rounded-full">{unreadMsgs}</span>
+                )}
+              </button>
+
+              <Link to="/settings" onClick={() => setShowMobileProfile(false)}
+                className="flex items-center gap-4 px-5 py-3.5 text-gray-200 text-sm hover:bg-gray-800 active:bg-gray-700 transition-colors">
+                <Settings size={18} className="text-gray-400" /> Ayarlar
+              </Link>
+
+              <Link to="/request" onClick={() => setShowMobileProfile(false)}
+                className="flex items-center gap-4 px-5 py-3.5 text-gray-200 text-sm hover:bg-gray-800 active:bg-gray-700 transition-colors">
+                <Send size={18} className="text-gray-400" /> İstek / Öneri
+              </Link>
+
+              <div className="border-t border-gray-800 mt-1">
+                <button onClick={() => { handleLogout(); setShowMobileProfile(false); }}
+                  className="w-full flex items-center gap-4 px-5 py-4 text-red-400 text-sm font-bold hover:bg-red-900/20 active:bg-red-900/30 transition-colors">
+                  <LogOut size={18} /> Çıkış Yap
+                </button>
               </div>
             </div>
           </div>
-        )}
-      </nav>
+        </div>
+      )}
 
       {/* Chat Modal */}
       {showChat && <ChatModal onClose={() => { setShowChat(false); setUnreadMsgs(0); }} />}
 
       {/* Main Content */}
-      <main className="flex-grow w-full">
+      <main className="flex-grow w-full pb-16 md:pb-0">
         {children}
       </main>
+
+      {/* ── Alt Navigasyon (sadece mobil) ── */}
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-[#18181b]/95 backdrop-blur-md border-t border-gray-800">
+        <div className="flex items-center justify-around h-16 px-2">
+          {[
+            { to: '/',           icon: Home,          label: 'Ana Sayfa' },
+            { to: '/news',       icon: Newspaper,     label: 'Haberler'  },
+            { to: '/explore',    icon: Compass,       label: 'Keşfet'    },
+            { to: '/social',     icon: MessageCircle, label: 'Mesajlar', badge: unreadMsgs },
+          ].map(({ to, icon: Icon, label, badge }) => {
+            const active = location.pathname === to;
+            return (
+              <Link
+                key={to}
+                to={to}
+                className={`flex flex-col items-center justify-center gap-0.5 flex-1 py-1 relative transition-colors ${active ? 'text-amber-500' : 'text-gray-500'}`}
+              >
+                <div className="relative">
+                  <Icon size={22} strokeWidth={active ? 2.5 : 1.8} />
+                  {!!badge && badge > 0 && (
+                    <span className="absolute -top-1 -right-1.5 min-w-[14px] h-3.5 bg-amber-500 text-black text-[9px] font-black rounded-full flex items-center justify-center px-0.5">{badge}</span>
+                  )}
+                </div>
+                <span className={`text-[9px] font-bold ${active ? 'text-amber-500' : 'text-gray-600'}`}>{label}</span>
+                {active && <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-4 h-0.5 bg-amber-500 rounded-full" />}
+              </Link>
+            );
+          })}
+        </div>
+      </nav>
 
       {/* Footer */}
       <footer className="border-t border-gray-800 bg-[#0f0f10] py-12">
