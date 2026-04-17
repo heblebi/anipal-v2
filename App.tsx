@@ -26,6 +26,7 @@ import { UserRole } from './types';
 import ContributePage from './pages/ContributePage';
 import MyContributionsPage from './pages/MyContributionsPage';
 import ForgotPassword from './pages/ForgotPassword';
+import PrivacyPage from './pages/PrivacyPage';
 
 // Supabase PASSWORD_RECOVERY eventini global olarak dinle
 const RecoveryHandler = () => {
@@ -96,6 +97,8 @@ const AppRoutes = () => {
       <Route path="/contribute" element={<ProtectedRoute requireRole={[UserRole.EDITOR, UserRole.ADMIN, UserRole.MODERATOR]}><ContributePage /></ProtectedRoute>} />
       <Route path="/contribute/:animeId" element={<ProtectedRoute requireRole={[UserRole.EDITOR, UserRole.ADMIN, UserRole.MODERATOR]}><ContributePage /></ProtectedRoute>} />
       <Route path="/my-contributions" element={<ProtectedRoute><MyContributionsPage /></ProtectedRoute>} />
+
+      <Route path="/privacy" element={<PrivacyPage />} />
 
       {/* Eski /add-anime linkini admin'e yönlendir */}
       <Route path="/add-anime" element={<Navigate to="/admin/add-anime" />} />
