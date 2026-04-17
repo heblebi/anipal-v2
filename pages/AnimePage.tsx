@@ -52,6 +52,16 @@ const AnimePage = () => {
     }
   }, [user, id]);
 
+  // Initialize selectedSeason from last-watched episode — MUST be before any early returns
+  useEffect(() => {
+    if (!anime) return;
+    const sorted = [...anime.episodes].sort((a, b) => a.number - b.number);
+    const lastSeenId = user && id ? localStorage.getItem(`last_ep_${user.id}_${id}`) : null;
+    const epId = lastSeenId && sorted.find(e => e.id === lastSeenId) ? lastSeenId : (sorted[0]?.id || null);
+    const ep = sorted.find(e => e.id === epId);
+    if (ep) setSelectedSeason(ep.season || 1);
+  }, [anime?.id]);
+
 const handleSaveEntry = async () => {
     if (!user || !anime) return;
     await saveAnimeEntry(user.id, anime.id, ratingForm);
@@ -108,11 +118,6 @@ const handleSaveEntry = async () => {
   const firstEpId = sortedEps.length > 0 ? sortedEps[0].id : null;
   const lastSeenEpId = user && id ? localStorage.getItem(`last_ep_${user.id}_${id}`) : null;
   const watchEpId = lastSeenEpId && sortedEps.find(e => e.id === lastSeenEpId) ? lastSeenEpId : firstEpId;
-  // Initialize season from last seen ep (or first ep)
-  React.useEffect(() => {
-    const ep = sortedEps.find(e => e.id === watchEpId);
-    if (ep) setSelectedSeason(ep.season || 1);
-  }, [anime.id]);
 
   return (
     <div className="animate-in fade-in duration-500 bg-[#0f0f10] min-h-screen">
