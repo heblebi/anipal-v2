@@ -90,6 +90,7 @@ export interface FansubGroup {
 export interface Episode {
   id: string;
   number: number;
+  season?: number; // 1-based, defaults to 1 if not set
   title: string;
   videoUrl: string;
   sources?: VideoSource[];
@@ -234,6 +235,7 @@ export interface EpisodeContribution {
   type?: 'episode' | 'source'; // 'episode' = new episode, 'source' = add to existing episode
   targetEpisodeId?: string;    // for source type: which episode to add the fansub to
   episodeNumber: number;
+  season?: number;
   episodeTitle: string;
   thumbnail?: string;
   fansubName: string;

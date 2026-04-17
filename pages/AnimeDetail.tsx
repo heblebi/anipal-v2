@@ -12,7 +12,7 @@ import Button from '../components/Button';
 const AnimeDetail = () => {
   const { id } = useParams<{ id: string }>();
   const [searchParams] = useSearchParams();
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated, updateUser } = useAuth();
   const navigate = useNavigate();
 
   const [anime, setAnime] = useState<Anime | null>(null);
@@ -41,6 +41,9 @@ const AnimeDetail = () => {
   const [playerStarted, setPlayerStarted] = useState(false);
   const [xpGranted, setXpGranted] = useState(false);
 
+  // Season state
+  const [selectedSeason, setSelectedSeason] = useState<number>(1);
+
   // Mini profiles map: userId -> { username, avatar }
   const [miniProfiles, setMiniProfiles] = useState<Map<string, { username: string; avatar: string }>>(new Map());
   const [episodeUploader, setEpisodeUploader] = useState<{ id: string; username: string; avatar: string } | null>(null);
@@ -56,8 +59,15 @@ const AnimeDetail = () => {
           if (data.episodes.length > 0) {
             const epIdFromQuery = searchParams.get('ep');
             const sorted = [...data.episodes].sort((a, b) => a.number - b.number);
-            const targetEp = epIdFromQuery ? sorted.find(e => e.id === epIdFromQuery) || sorted[0] : sorted[0];
+            const lastEpId = !epIdFromQuery && user ? localStorage.getItem(`last_ep_${user.id}_${data.id}`) : null;
+            const targetEp = epIdFromQuery
+              ? sorted.find(e => e.id === epIdFromQuery) || sorted[0]
+              : lastEpId
+                ? sorted.find(e => e.id === lastEpId) || sorted[0]
+                : sorted[0];
             setSelectedEpisode(targetEp);
+            setSelectedSeason(targetEp.season || 1);
+            if (user) localStorage.setItem(`last_ep_${user.id}_${data.id}`, targetEp.id);
             const fansubs = getEpFansubs(targetEp);
             setSelectedFansubName(fansubs[0].name);
             setSelectedSource(fansubs[0].sources[0] || null);
@@ -189,9 +199,11 @@ const AnimeDetail = () => {
       if (isWatched) {
           setIsWatched(false);
           await unmarkEpisodeWatched(user.id, selectedEpisode.id);
+          updateUser({ watchedEpisodes: (user.watchedEpisodes || []).filter((epId: string) => epId !== selectedEpisode.id) });
       } else {
           setIsWatched(true);
           await markEpisodeWatched(user.id, selectedEpisode.id);
+          updateUser({ watchedEpisodes: [...(user.watchedEpisodes || []), selectedEpisode.id] });
       }
   };
 
@@ -322,33 +334,61 @@ const AnimeDetail = () => {
               );
             })()}
 
-            <div className="bg-black rounded-xl overflow-hidden shadow-2xl border border-gray-800">
-                {selectedEpisode ? (
-                <VideoPlayer
-                    key={`${selectedEpisode.id}-${selectedSource?.url}`}
-                    embedUrl={selectedSource?.url || selectedEpisode.videoUrl}
-                    poster={anime.bannerImage || anime.coverImage}
-                    onPlay={() => setPlayerStarted(true)}
-                />
-                ) : (
-                    <div className="aspect-video flex items-center justify-center bg-gray-900 text-gray-500">
+            <div className="rounded-xl overflow-hidden shadow-2xl">
+                {selectedEpisode ? (() => {
+                  const epSeason = selectedEpisode.season || 1;
+                  const sortedForPlayer = [...anime.episodes].filter(e => (e.season || 1) === epSeason).sort((a, b) => a.number - b.number);
+                  const curIdx = sortedForPlayer.findIndex(e => e.id === selectedEpisode.id);
+                  const prevEpPlayer = curIdx > 0 ? sortedForPlayer[curIdx - 1] : null;
+                  const nextEpPlayer = curIdx < sortedForPlayer.length - 1 ? sortedForPlayer[curIdx + 1] : null;
+                  const goToEpPlayer = (ep: Episode) => {
+                    setSelectedEpisode(ep);
+                    setSelectedSeason(ep.season || 1);
+                    const fansubs = getEpFansubs(ep);
+                    setSelectedFansubName(fansubs[0].name);
+                    setSelectedSource(fansubs[0].sources[0] || null);
+                    const uid = ep.addedBy || anime?.uploadedBy;
+                    getUploaderInfo(uid || '').then(setEpisodeUploader).catch(() => {});
+                    if (user && id) localStorage.setItem(`last_ep_${user.id}_${id}`, ep.id);
+                    navigate(`/anime/${id}/watch?ep=${ep.id}`, { replace: true });
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                  };
+                  return (
+                    <VideoPlayer
+                      key={`${selectedEpisode.id}-${selectedSource?.url}`}
+                      embedUrl={selectedSource?.url || selectedEpisode.videoUrl}
+                      poster={anime.bannerImage || anime.coverImage}
+                      onPlay={() => setPlayerStarted(true)}
+                      hasPrev={!!prevEpPlayer}
+                      hasNext={!!nextEpPlayer}
+                      onPrev={() => prevEpPlayer && goToEpPlayer(prevEpPlayer)}
+                      onNext={() => nextEpPlayer && goToEpPlayer(nextEpPlayer)}
+                      prevLabel={prevEpPlayer ? `${prevEpPlayer.number}. Bölüm` : undefined}
+                      nextLabel={nextEpPlayer ? `${nextEpPlayer.number}. Bölüm` : undefined}
+                    />
+                  );
+                })() : (
+                    <div className="aspect-video flex items-center justify-center bg-gray-900 text-gray-500 rounded-xl border border-gray-800">
                         <p>Bölüm seçilmedi.</p>
                     </div>
                 )}
             </div>
 
             {selectedEpisode && (() => {
-                const sorted = [...anime.episodes].sort((a, b) => a.number - b.number);
+                const epSeason2 = selectedEpisode.season || 1;
+                const sorted = [...anime.episodes].filter(e => (e.season || 1) === epSeason2).sort((a, b) => a.number - b.number);
                 const currentIdx = sorted.findIndex(e => e.id === selectedEpisode.id);
                 const prevEp = currentIdx > 0 ? sorted[currentIdx - 1] : null;
                 const nextEp = currentIdx < sorted.length - 1 ? sorted[currentIdx + 1] : null;
                 const goToEp = (ep: Episode) => {
                     setSelectedEpisode(ep);
+                    setSelectedSeason(ep.season || 1);
                     const fansubs = getEpFansubs(ep);
                     setSelectedFansubName(fansubs[0].name);
                     setSelectedSource(fansubs[0].sources[0] || null);
                     const uid = ep.addedBy || anime?.uploadedBy;
                     getUploaderInfo(uid || '').then(setEpisodeUploader).catch(() => {});
+                    if (user && id) localStorage.setItem(`last_ep_${user.id}_${id}`, ep.id);
                     navigate(`/anime/${id}/watch?ep=${ep.id}`, { replace: true });
                     window.scrollTo({ top: 0, behavior: 'smooth' });
                 };
@@ -439,42 +479,73 @@ const AnimeDetail = () => {
 
         {/* Sidebar (Episode List) */}
         <div className="lg:col-span-1">
-            <div className="bg-[#18181b] rounded-xl border border-gray-800 p-0 overflow-hidden lg:sticky lg:top-24">
-                <div className="p-3 sm:p-4 border-b border-gray-800 bg-gray-900/50">
-                    <h3 className="font-bold text-white flex items-center gap-2">
-                        <List className="text-amber-500" size={18} /> Bölümler ({anime.episodes.length})
-                    </h3>
-                </div>
-                <div className="max-h-64 sm:max-h-80 lg:max-h-[600px] overflow-y-auto custom-scrollbar">
-                    {[...anime.episodes].sort((a, b) => a.number - b.number).map((ep) => (
-                        <button
-                            key={ep.id}
-                            onClick={() => {
-                              setSelectedEpisode(ep);
-                              const sources = ep.sources && ep.sources.length > 0 ? ep.sources : [{ name: 'Varsayılan', url: ep.videoUrl }];
-                              setSelectedSource(sources[0]);
-                              navigate(`/anime/${id}/watch?ep=${ep.id}`, { replace: true });
-                              window.scrollTo({ top: 0, behavior: 'smooth' });
-                            }}
-                            className={`w-full text-left p-3 sm:p-4 border-b border-gray-800/50 hover:bg-gray-800 transition-colors flex items-center gap-3 group ${selectedEpisode?.id === ep.id ? 'bg-gray-800 border-l-4 border-l-amber-500' : ''}`}
-                        >
-                            {ep.thumbnail ? (
-                              <img src={ep.thumbnail} className="w-16 h-10 sm:w-14 sm:h-9 object-cover rounded flex-shrink-0" />
-                            ) : (
-                              <span className="text-xl font-black text-gray-700 group-hover:text-gray-500 w-8 flex-shrink-0 text-center">{ep.number}</span>
-                            )}
-                            <div className="flex-1 min-w-0">
-                                <div className="text-sm font-bold text-gray-200 group-hover:text-white line-clamp-1">{ep.number}. {ep.title}</div>
-                                {ep.fansub && <div className="text-xs text-amber-500">{ep.fansub}</div>}
-                                {ep.sources && ep.sources.length > 1 && (
-                                  <div className="text-xs text-gray-500">{ep.sources.length} oynatıcı</div>
+            {(() => {
+              const seasons = [...new Set(anime.episodes.map(e => e.season || 1))].sort((a, b) => a - b);
+              const multiSeason = seasons.length > 1;
+              const filteredEps = [...anime.episodes]
+                .filter(e => (e.season || 1) === selectedSeason)
+                .sort((a, b) => a.number - b.number);
+              return (
+                <div className="bg-[#18181b] rounded-xl border border-gray-800 p-0 overflow-hidden lg:sticky lg:top-24">
+                    <div className="p-3 sm:p-4 border-b border-gray-800 bg-gray-900/50">
+                        <h3 className="font-bold text-white flex items-center gap-2">
+                            <List className="text-amber-500" size={18} /> Bölümler ({anime.episodes.length})
+                        </h3>
+                    </div>
+                    {/* Season Tabs */}
+                    {multiSeason && (
+                      <div className="flex gap-1 p-2 border-b border-gray-800 overflow-x-auto custom-scrollbar bg-gray-900/30 flex-nowrap">
+                        {seasons.map(s => (
+                          <button
+                            key={s}
+                            onClick={() => setSelectedSeason(s)}
+                            className={`flex-shrink-0 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${selectedSeason === s ? 'bg-amber-500 text-black' : 'bg-gray-800 text-gray-400 hover:bg-gray-700 hover:text-white'}`}
+                          >
+                            {s}. Sezon
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    <div className="max-h-64 sm:max-h-80 lg:max-h-[600px] overflow-y-auto custom-scrollbar">
+                        {filteredEps.length === 0 && (
+                          <div className="p-6 text-center text-gray-500 text-sm">Bu sezonda bölüm yok.</div>
+                        )}
+                        {filteredEps.map((ep) => (
+                            <button
+                                key={ep.id}
+                                onClick={() => {
+                                  setSelectedEpisode(ep);
+                                  const sources = ep.sources && ep.sources.length > 0 ? ep.sources : [{ name: 'Varsayılan', url: ep.videoUrl }];
+                                  setSelectedSource(sources[0]);
+                                  const fansubs = getEpFansubs(ep);
+                                  setSelectedFansubName(fansubs[0].name);
+                                  const uid = ep.addedBy || anime?.uploadedBy;
+                                  getUploaderInfo(uid || '').then(setEpisodeUploader).catch(() => {});
+                                  if (user && id) localStorage.setItem(`last_ep_${user.id}_${id}`, ep.id);
+                                  navigate(`/anime/${id}/watch?ep=${ep.id}`, { replace: true });
+                                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                                }}
+                                className={`w-full text-left p-3 sm:p-4 border-b border-gray-800/50 hover:bg-gray-800 transition-colors flex items-center gap-3 group ${selectedEpisode?.id === ep.id ? 'bg-gray-800 border-l-4 border-l-amber-500' : ''}`}
+                            >
+                                {ep.thumbnail ? (
+                                  <img src={ep.thumbnail} className="w-16 h-10 sm:w-14 sm:h-9 object-cover rounded flex-shrink-0" />
+                                ) : (
+                                  <span className="text-xl font-black text-gray-700 group-hover:text-gray-500 w-8 flex-shrink-0 text-center">{ep.number}</span>
                                 )}
-                            </div>
-                            {selectedEpisode?.id === ep.id && <PlayCircle className="text-amber-500 flex-shrink-0" size={18} />}
-                        </button>
-                    ))}
+                                <div className="flex-1 min-w-0">
+                                    <div className="text-sm font-bold text-gray-200 group-hover:text-white line-clamp-1">{ep.number}. {ep.title}</div>
+                                    {ep.fansub && <div className="text-xs text-amber-500">{ep.fansub}</div>}
+                                    {ep.sources && ep.sources.length > 1 && (
+                                      <div className="text-xs text-gray-500">{ep.sources.length} oynatıcı</div>
+                                    )}
+                                </div>
+                                {selectedEpisode?.id === ep.id && <PlayCircle className="text-amber-500 flex-shrink-0" size={18} />}
+                            </button>
+                        ))}
+                    </div>
                 </div>
-            </div>
+              );
+            })()}
         </div>
       </div>
 

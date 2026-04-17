@@ -6,14 +6,16 @@ import { Star } from 'lucide-react';
 interface AnimeCardProps {
   anime: Anime;
   variant?: 'portrait' | 'landscape';
+  to?: string;
+  continueLabel?: string;
 }
 
-const AnimeCard: React.FC<AnimeCardProps> = ({ anime, variant = 'portrait' }) => {
+const AnimeCard: React.FC<AnimeCardProps> = ({ anime, variant = 'portrait', to, continueLabel }) => {
   const isLandscape = variant === 'landscape';
 
   return (
-    <Link 
-      to={`/anime/${anime.id}`} 
+    <Link
+      to={to || `/anime/${anime.id}`}
       className={`group relative block flex-shrink-0 transition-all duration-300 hover:z-20 hover:scale-110 ${isLandscape ? 'w-64 md:w-80' : 'w-36 md:w-48'}`}
     >
       <div className={`relative overflow-hidden rounded-md bg-[#18181b] shadow-lg ${isLandscape ? 'aspect-video' : 'aspect-[2/3]'}`}>
@@ -41,9 +43,15 @@ const AnimeCard: React.FC<AnimeCardProps> = ({ anime, variant = 'portrait' }) =>
       <div className="mt-2 opacity-100 group-hover:opacity-100 transition-opacity">
         <h3 className="text-sm font-bold text-gray-200 truncate group-hover:text-white">{anime.title}</h3>
         <div className="flex items-center gap-2 text-[10px] text-gray-400">
-           <span>{anime.genres[0]}</span>
-           <span className="w-1 h-1 rounded-full bg-gray-600"></span>
-           <span>{anime.episodes.length} Bölüm</span>
+          {continueLabel ? (
+            <span className="text-amber-400 font-semibold">{continueLabel}</span>
+          ) : (
+            <>
+              <span>{anime.genres[0]}</span>
+              <span className="w-1 h-1 rounded-full bg-gray-600"></span>
+              <span>{anime.episodes.length} Bölüm</span>
+            </>
+          )}
         </div>
       </div>
     </Link>

@@ -61,7 +61,13 @@ const Login = () => {
           </Button>
         </form>
 
-        <p className="mt-6 text-center text-gray-400 text-sm">
+        <div className="mt-4 text-center">
+          <Link to="/forgot-password" className="text-xs text-gray-500 hover:text-gray-300 transition-colors">
+            Şifremi Unuttum
+          </Link>
+        </div>
+
+        <p className="mt-4 text-center text-gray-400 text-sm">
           Hesabınız yok mu?{' '}
           <Link to="/register" className="text-amber-500 hover:text-amber-400 font-medium">
             Kayıt Olun

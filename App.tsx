@@ -1,5 +1,6 @@
-import React from 'react';
-import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
+import React, { useEffect } from 'react';
+import { HashRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
+import { supabase } from './services/supabase';
 import Layout from './components/Layout';
 import Home from './pages/Home';
 import Explore from './pages/Explore';
@@ -24,6 +25,22 @@ import { SiteSettingsProvider } from './context/SiteSettingsContext';
 import { UserRole } from './types';
 import ContributePage from './pages/ContributePage';
 import MyContributionsPage from './pages/MyContributionsPage';
+import ForgotPassword from './pages/ForgotPassword';
+
+// Supabase PASSWORD_RECOVERY eventini global olarak dinle
+const RecoveryHandler = () => {
+  const navigate = useNavigate();
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'PASSWORD_RECOVERY') {
+        sessionStorage.setItem('pw_recovery', '1');
+        navigate('/forgot-password', { replace: true });
+      }
+    });
+    return () => subscription.unsubscribe();
+  }, [navigate]);
+  return null;
+};
 
 // Normal kullanıcı korumalı rota
 const ProtectedRoute = ({ children, requireRole }: { children?: React.ReactNode, requireRole?: UserRole[] }) => {
@@ -41,13 +58,16 @@ const ProtectedRoute = ({ children, requireRole }: { children?: React.ReactNode,
 
 const AppRoutes = () => {
   return (
-    <Routes>
+    <>
+      <RecoveryHandler />
+      <Routes>
       <Route path="/" element={<Home />} />
       <Route path="/explore" element={<Explore />} />
       <Route path="/news" element={<NewsPage />} />
       <Route path="/leaderboard" element={<Leaderboard />} />
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
+      <Route path="/forgot-password" element={<ForgotPassword />} />
       <Route path="/news/:id" element={<NewsDetailPage />} />
       <Route path="/anime/:id" element={<AnimePage />} />
       <Route path="/anime/:id/watch" element={<AnimeDetail />} />
@@ -80,6 +100,7 @@ const AppRoutes = () => {
       {/* Eski /add-anime linkini admin'e yönlendir */}
       <Route path="/add-anime" element={<Navigate to="/admin/add-anime" />} />
     </Routes>
+    </>
   );
 };
 

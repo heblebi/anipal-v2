@@ -6,7 +6,7 @@ import { UserRole, Notification } from '../types';
 import { LogOut, Menu, X, Settings, User as UserIcon, Search, Bell, ChevronDown, Send, MessageCircle, Users, UserCheck, UserPlus, Check } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useSiteSettings } from '../context/SiteSettingsContext';
-import { getNotifications, markNotificationsAsRead, clearNotifications } from '../services/mockBackend';
+import { getNotifications, markNotificationsAsRead, clearNotifications, getOnlineStatuses } from '../services/mockBackend';
 import { getConversations, getTotalUnreadMessages, getFriends, getPendingRequests, acceptFriendRequest, rejectFriendRequest, searchUsers, sendFriendRequest } from '../services/socialBackend';
 import ChatModal from './ChatModal';
 import type { Conversation, Friendship } from '../types';
@@ -38,6 +38,7 @@ const Layout = ({ children }: { children?: React.ReactNode }) => {
   const [friends, setFriends] = useState<Friendship[]>([]);
   const [pendingReqs, setPendingReqs] = useState<Friendship[]>([]);
   const [friendsLoading, setFriendsLoading] = useState(false);
+  const [friendOnlineMap, setFriendOnlineMap] = useState<Map<string, boolean>>(new Map());
   const [friendSearch, setFriendSearch] = useState('');
   const [searchResults, setSearchResults] = useState<import('../types').User[]>([]);
   const [searchLoading, setSearchLoading] = useState(false);
@@ -119,6 +120,8 @@ const Layout = ({ children }: { children?: React.ReactNode }) => {
           const [f, p] = await Promise.all([getFriends(user.id), getPendingRequests(user.id)]);
           setFriends(f);
           setPendingReqs(p);
+          const ids = f.map(fr => fr.requesterId === user.id ? fr.addresseeId : fr.requesterId);
+          if (ids.length) getOnlineStatuses(ids).then(setFriendOnlineMap).catch(() => {});
       } catch { /* ignore */ } finally {
           setFriendsLoading(false);
       }
@@ -429,12 +432,16 @@ const Layout = ({ children }: { children?: React.ReactNode }) => {
                                         <p className="text-[10px] font-bold text-gray-500 uppercase px-2 mb-2">Arkadaşlar ({friends.length})</p>
                                         {friends.map(f => {
                                           const other = f.requesterId === user.id ? f.addressee : f.requester;
+                                          const isOnline = friendOnlineMap.get(other?.id ?? '') ?? false;
                                           return (
                                             <Link key={f.id} to={`/profile/${other?.id}`} onClick={() => setShowProfileMenu(false)} className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-gray-800 transition-colors">
-                                              <img src={other?.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${other?.username}`} className="w-7 h-7 rounded-full object-cover" alt="" />
+                                              <div className="relative flex-shrink-0">
+                                                <img src={other?.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${other?.username}`} className="w-7 h-7 rounded-full object-cover" alt="" />
+                                                <span className={`absolute bottom-0 right-0 w-2 h-2 rounded-full border border-[#18181b] ${isOnline ? 'bg-green-500' : 'bg-gray-600'}`} />
+                                              </div>
                                               <div className="min-w-0">
                                                 <p className="text-xs text-white font-medium truncate">{other?.displayName || other?.username}</p>
-                                                <p className="text-[10px] text-gray-500">@{other?.username}</p>
+                                                <p className={`text-[10px] ${isOnline ? 'text-green-500' : 'text-gray-500'}`}>{isOnline ? 'Çevrimiçi' : 'Çevrimdışı'}</p>
                                               </div>
                                             </Link>
                                           );

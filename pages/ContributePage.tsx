@@ -44,6 +44,7 @@ const ContributePage = () => {
 
   // Episode mode fields
   const [episodeNumber, setEpisodeNumber] = useState('');
+  const [episodeSeason, setEpisodeSeason] = useState('1');
   const [episodeTitle, setEpisodeTitle] = useState('');
   const [thumbnail, setThumbnail] = useState('');
 
@@ -137,6 +138,7 @@ const ContributePage = () => {
       await submitContribution(user.id, {
         animeId: selectedAnimeId,
         episodeNumber: mode === 'source' ? targetEpisode!.number : parseInt(episodeNumber),
+        season: mode === 'source' ? (targetEpisode!.season || 1) : (parseInt(episodeSeason) || 1),
         episodeTitle: mode === 'source' ? targetEpisode!.title : episodeTitle.trim(),
         thumbnail: mode === 'source' ? targetEpisode!.thumbnail : (thumbnail.trim() || undefined),
         fansubName: fansubName.trim(),
@@ -282,7 +284,17 @@ const ContributePage = () => {
           {mode === 'episode' && (
             <div className="bg-[#18181b] border border-gray-800 rounded-xl p-4 space-y-3">
               <h2 className="text-sm font-bold text-amber-500 uppercase">Bölüm Bilgileri</h2>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-3 gap-3">
+                <div className="space-y-1">
+                  <label className="text-xs text-gray-400">Sezon</label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={episodeSeason}
+                    onChange={e => setEpisodeSeason(e.target.value)}
+                    className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:border-amber-500 focus:outline-none"
+                  />
+                </div>
                 <div className="space-y-1">
                   <label className="text-xs text-gray-400">Bölüm No *</label>
                   <input

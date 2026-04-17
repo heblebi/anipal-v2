@@ -741,7 +741,8 @@ const getEpisodesRaw = async (animeId: string): Promise<any[]> => {
 };
 
 const setEpisodes = async (animeId: string, episodes: any[]) => {
-    await supabase.from('animes').update({ episodes }).eq('id', animeId);
+    const { error } = await supabase.from('animes').update({ episodes }).eq('id', animeId);
+    if (error) throw new Error(error.message);
 };
 
 export const addEpisode = async (animeId: string, episodeData: any) => {
@@ -1143,6 +1144,39 @@ export const fetchAniListData = async (search: string) => {
     return { ...media, description: translatedDesc, genres: translatedGenres, characters };
 };
 
+// AniList üzerinden SEQUEL zincirini takip eder → [s2Id, s3Id, ...]
+const fetchSequelChain = async (anilistId: number, visited = new Set<number>(), depth = 0): Promise<number[]> => {
+    if (depth >= 5 || visited.has(anilistId)) return [];
+    visited.add(anilistId);
+    try {
+        const query = `query($id:Int){Media(id:$id,type:ANIME){relations{edges{relationType node{id format}}}}}`;
+        const res = await fetch('https://graphql.anilist.co', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ query, variables: { id: anilistId } })
+        });
+        const data = await res.json();
+        const edges: any[] = data.data?.Media?.relations?.edges || [];
+        const sequel = edges.find(e => e.relationType === 'SEQUEL' && (e.node.format === 'TV' || e.node.format === 'TV_SHORT'));
+        if (!sequel) return [];
+        const more = await fetchSequelChain(sequel.node.id, visited, depth + 1);
+        return [sequel.node.id, ...more];
+    } catch { return []; }
+};
+
+// Tüm sezonları (SEQUEL zinciri dahil) ani.zip'ten çeker
+export const fetchAllSeasons = async (mainAnilistId: number): Promise<{ season: number; episodes: { number: number; title: string; thumbnail: string }[] }[]> => {
+    const sequelIds = await fetchSequelChain(mainAnilistId);
+    const allIds = [mainAnilistId, ...sequelIds];
+    const results = await Promise.all(
+        allIds.map((id, i) => fetchMALEpisodes(id)
+            .then(eps => ({ season: i + 1, episodes: eps }))
+            .catch(() => ({ season: i + 1, episodes: [] as { number: number; title: string; thumbnail: string }[] }))
+        )
+    );
+    return results.filter(r => r.episodes.length > 0);
+};
+
 export const fetchMALEpisodes = async (anilistId: number): Promise<{ number: number; title: string; thumbnail: string }[]> => {
     const res = await fetch(`https://api.ani.zip/mappings?anilist_id=${anilistId}`);
     const data = await res.json();
@@ -1242,16 +1276,29 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 export const getMiniProfiles = async (ids: string[]): Promise<Map<string, { username: string; avatar: string }>> => {
     const unique = [...new Set(ids.filter(id => id && UUID_RE.test(id)))];
     if (!unique.length) return new Map();
-    const { data, error } = await supabase.from('profiles').select('id, username, avatar_url').in('id', unique);
+    const { data, error } = await supabase.from('profiles').select('id, username, avatar').in('id', unique);
     if (error) return new Map();
-    return new Map((data || []).map((p: any) => [p.id, { username: p.username, avatar: p.avatar_url || '' }]));
+    return new Map((data || []).map((p: any) => [p.id, { username: p.username, avatar: p.avatar || '' }]));
+};
+
+export const updateLastSeen = async (userId: string) => {
+    if (!userId) return;
+    await supabase.from('profiles').update({ last_seen_at: new Date().toISOString() }).eq('id', userId);
+};
+
+export const getOnlineStatuses = async (userIds: string[]): Promise<Map<string, boolean>> => {
+    const unique = [...new Set(userIds.filter(id => id && UUID_RE.test(id)))];
+    if (!unique.length) return new Map();
+    const { data } = await supabase.from('profiles').select('id, last_seen_at').in('id', unique);
+    const threshold = Date.now() - 5 * 60 * 1000; // 5 dakika
+    return new Map((data || []).map((p: any) => [p.id, p.last_seen_at ? new Date(p.last_seen_at).getTime() > threshold : false]));
 };
 
 export const getUploaderInfo = async (userId: string): Promise<{ id: string; username: string; avatar: string } | null> => {
     if (!userId || !UUID_RE.test(userId)) return null;
-    const { data } = await supabase.from('profiles').select('id, username, avatar_url').eq('id', userId).single();
+    const { data } = await supabase.from('profiles').select('id, username, avatar').eq('id', userId).single();
     if (!data) return null;
-    return { id: data.id, username: data.username, avatar: data.avatar_url || '' };
+    return { id: data.id, username: data.username, avatar: data.avatar || '' };
 };
 
 // ─── Episode Contributions ─────────────────────────────────────────────────────
@@ -1293,7 +1340,7 @@ export const submitContribution = async (
 export const getMyContributions = async (userId: string): Promise<EpisodeContribution[]> => {
     const { data, error } = await supabase
         .from('episode_contributions')
-        .select('*, profiles(username, avatar_url)')
+        .select('*, profiles(username, avatar)')
         .eq('submitted_by', userId)
         .order('created_at', { ascending: false });
     if (error) throw new Error(error.message);
@@ -1321,7 +1368,7 @@ export const getMyContributions = async (userId: string): Promise<EpisodeContrib
 export const getPendingContributions = async (): Promise<EpisodeContribution[]> => {
     const { data, error } = await supabase
         .from('episode_contributions')
-        .select('*, profiles(username, avatar_url)')
+        .select('*, profiles(username, avatar)')
         .order('created_at', { ascending: false });
     if (error) throw new Error(error.message);
     return (data || []).map((r: any) => ({
@@ -1336,7 +1383,7 @@ export const getPendingContributions = async (): Promise<EpisodeContribution[]> 
         sources: r.sources || [],
         submittedBy: r.submitted_by,
         submitterUsername: r.profiles?.username,
-        submitterAvatar: r.profiles?.avatar_url,
+        submitterAvatar: r.profiles?.avatar,
         status: r.status,
         pendingAction: r.pending_action,
         pendingData: r.pending_data,
@@ -1358,7 +1405,7 @@ export const approveContribution = async (id: string) => {
     // Fetch contributor profile for attribution
     const { data: profile } = await supabase
         .from('profiles')
-        .select('username, avatar_url')
+        .select('username, avatar')
         .eq('id', contrib.submitted_by)
         .single();
 
@@ -1373,7 +1420,7 @@ export const approveContribution = async (id: string) => {
         sources: contrib.sources,
         contributorId: contrib.submitted_by,
         contributorUsername: profile?.username || null,
-        contributorAvatar: profile?.avatar_url || null,
+        contributorAvatar: profile?.avatar || null,
     };
 
     if (epIdx === -1 && (contrib.type || 'episode') === 'episode') {

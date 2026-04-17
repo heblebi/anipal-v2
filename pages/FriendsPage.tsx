@@ -7,6 +7,7 @@ import {
   removeFriend, getConversations, getMessages, sendMessage, searchUsers,
   sendFriendRequest,
 } from '../services/socialBackend';
+import { getOnlineStatuses } from '../services/mockBackend';
 import type { Friendship, Conversation, Message } from '../types';
 
 type Tab = 'friends' | 'messages' | 'requests';
@@ -20,6 +21,7 @@ const FriendsPage = () => {
   const [friends, setFriends] = useState<Friendship[]>([]);
   const [pending, setPending] = useState<Friendship[]>([]);
   const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [onlineMap, setOnlineMap] = useState<Map<string, boolean>>(new Map());
   const [loading, setLoading] = useState(true);
 
   // Active chat
@@ -65,6 +67,8 @@ const FriendsPage = () => {
       setFriends(f);
       setPending(p);
       setConversations(c);
+      const friendIds = f.map(fr => fr.requesterId === user!.id ? fr.addresseeId : fr.requesterId);
+      if (friendIds.length) getOnlineStatuses(friendIds).then(setOnlineMap).catch(() => {});
     } catch { /* ignore */ } finally {
       setLoading(false);
     }
@@ -251,13 +255,17 @@ const FriendsPage = () => {
                   {friends.map(f => {
                     const other = f.requesterId === user.id ? f.addressee : f.requester;
                     if (!other) return null;
+                    const isOnline = onlineMap.get(other.id) ?? false;
                     return (
                       <div key={f.id} className="flex items-center gap-3 px-4 py-3 border-b border-gray-800 last:border-0 hover:bg-gray-800/50 transition-colors">
                         <Link to={`/profile/${other.id}`} className="flex items-center gap-3 flex-1 min-w-0">
-                          <img src={avatar(other.username, other.avatar)} className="w-10 h-10 rounded-full object-cover flex-shrink-0" alt="" />
+                          <div className="relative flex-shrink-0">
+                            <img src={avatar(other.username, other.avatar)} className="w-10 h-10 rounded-full object-cover" alt="" />
+                            <span className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-[#18181b] ${isOnline ? 'bg-green-500' : 'bg-gray-600'}`} />
+                          </div>
                           <div className="min-w-0">
                             <p className="font-bold text-white text-sm truncate">{other.displayName || other.username}</p>
-                            <p className="text-xs text-gray-500">@{other.username}</p>
+                            <p className="text-xs text-gray-500">@{other.username} · <span className={isOnline ? 'text-green-400' : 'text-gray-600'}>{isOnline ? 'Çevrimiçi' : 'Çevrimdışı'}</span></p>
                           </div>
                         </Link>
                         <div className="flex gap-2 flex-shrink-0">

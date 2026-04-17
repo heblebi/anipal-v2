@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { User } from '../types';
 import { supabase } from '../services/supabase';
-import { getUserFromSession, logout as apiLogout } from '../services/mockBackend';
+import { getUserFromSession, logout as apiLogout, updateLastSeen } from '../services/mockBackend';
 
 interface AuthContextType {
   user: User | null;
@@ -101,16 +101,17 @@ export const AuthProvider = ({ children }: { children?: ReactNode }) => {
     };
   }, []);
 
-  // Periyodik ban kontrolü — her 2 dakikada bir ban durumunu Supabase'den kontrol et
+  // Periyodik ban kontrolü + last_seen_at güncelleme — her 2 dakikada bir
   useEffect(() => {
     if (!user) return;
+    updateLastSeen(user.id).catch(() => {});
     const check = async () => {
       try {
+        updateLastSeen(user.id).catch(() => {});
         const { data: { session } } = await supabase.auth.getSession();
         if (!session) return;
         const u = await getUserFromSession(session);
         if (!u) {
-          // Ban yenilendi veya oturum geçersiz
           clearCache();
           setUser(null);
         }

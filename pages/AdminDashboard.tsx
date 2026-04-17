@@ -17,7 +17,7 @@ interface EmbedResult {
   error?: string;
   url?: string;
 }
-import { Activity, Download, Users, CheckCircle, ShieldAlert, PlaySquare, Search, Shield, Plus, Trash2, Image, ChevronDown, ChevronRight, Pencil, X, Save, Globe, Loader2, CheckCircle2, AlertCircle, ImageIcon, Upload, Send, UserX, Flag, MessageSquare, Film, Link2 } from 'lucide-react';
+import { Activity, Download, Users, CheckCircle, ShieldAlert, PlaySquare, Search, Shield, Plus, Trash2, Image, ChevronDown, ChevronRight, Pencil, X, Save, Globe, Loader2, CheckCircle2, AlertCircle, ImageIcon, Upload, Send, UserX, Flag, MessageSquare, Film, Link2, RefreshCw } from 'lucide-react';
 import ImageCropModal from '../components/ImageCropModal';
 import { SITE_ASSETS, SiteAsset } from '../services/siteSettings';
 import { useSiteSettings } from '../context/SiteSettingsContext';
@@ -37,7 +37,8 @@ const AdminDashboard = () => {
   const isEditor = user?.role === UserRole.EDITOR;
   const [activeTab, setActiveTab] = useState<'stats' | 'manage' | 'news' | 'moderation' | 'users' | 'assets' | 'community'>(isEditor ? 'news' : 'stats');
   const [communityTab, setCommunityTab] = useState<'requests' | 'reports'>('requests');
-  const [moderationTab, setModerationTab] = useState<'animes' | 'episodes' | 'sources' | 'news'>('animes');
+  const [moderationTab, setModerationTab] = useState<'animes' | 'episodes' | 'sources' | 'news' | 'history'>('animes');
+  const [historySearch, setHistorySearch] = useState('');
   const { settings: siteSettings, uploadAndSave } = useSiteSettings();
   const [assetCrop, setAssetCrop] = useState<{ src: string; asset: SiteAsset } | null>(null);
   const [assetSaving, setAssetSaving] = useState<string | null>(null);
@@ -762,6 +763,11 @@ const AdminDashboard = () => {
       {activeTab === 'moderation' && (
           <div className="space-y-4">
             {/* Moderation inner tabs */}
+            <div className="flex items-center justify-between gap-2 mb-1">
+              <button onClick={loadContributions} disabled={contributionsLoading} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-white transition-colors disabled:opacity-50">
+                <RefreshCw size={12} className={contributionsLoading ? 'animate-spin' : ''} /> Yenile
+              </button>
+            </div>
             <div className="flex gap-2 border-b border-gray-800 pb-1 flex-wrap">
               <button onClick={() => setModerationTab('animes')} className={`flex items-center gap-2 px-4 py-2.5 text-sm font-bold transition-colors border-b-2 -mb-px ${moderationTab === 'animes' ? 'text-amber-500 border-amber-500' : 'text-gray-400 border-transparent hover:text-white'}`}>
                 <PlaySquare size={15}/> Anime Onayları <span className="bg-gray-800 text-gray-400 text-[10px] px-1.5 py-0.5 rounded-full">{animes.filter(a => a.status === AnimeStatus.PENDING).length}</span>
@@ -774,6 +780,9 @@ const AdminDashboard = () => {
               </button>
               <button onClick={() => setModerationTab('news')} className={`flex items-center gap-2 px-4 py-2.5 text-sm font-bold transition-colors border-b-2 -mb-px ${moderationTab === 'news' ? 'text-amber-500 border-amber-500' : 'text-gray-400 border-transparent hover:text-white'}`}>
                 <Activity size={15}/> Haber Onayları <span className="bg-gray-800 text-gray-400 text-[10px] px-1.5 py-0.5 rounded-full">{newsList.filter(n => n.status === 'pending').length}</span>
+              </button>
+              <button onClick={() => setModerationTab('history')} className={`flex items-center gap-2 px-4 py-2.5 text-sm font-bold transition-colors border-b-2 -mb-px ${moderationTab === 'history' ? 'text-amber-500 border-amber-500' : 'text-gray-400 border-transparent hover:text-white'}`}>
+                <Search size={15}/> Geçmiş İşlemler
               </button>
             </div>
 
@@ -809,8 +818,6 @@ const AdminDashboard = () => {
               const sorted = [
                 ...filtered.filter(c => c.pendingAction),
                 ...filtered.filter(c => !c.pendingAction && c.status === 'pending'),
-                ...filtered.filter(c => !c.pendingAction && c.status === 'approved'),
-                ...filtered.filter(c => !c.pendingAction && c.status === 'rejected'),
               ];
               if (contributionsLoading) return <div className="text-gray-500 text-sm text-center py-10">Yükleniyor...</div>;
               if (sorted.length === 0) return <div className="text-center py-12 text-gray-600 text-sm">Bekleyen onay yok.</div>;
@@ -907,6 +914,69 @@ const AdminDashboard = () => {
                             )}
                           </>
                         ) : null}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              );
+            })()}
+
+            {/* Geçmiş İşlemler */}
+            {moderationTab === 'history' && (() => {
+              const animeMap = new Map(animes.map(a => [a.id, a.title]));
+              const history = contributions
+                .filter(c => !c.pendingAction && (c.status === 'approved' || c.status === 'rejected'))
+                .sort((a, b) => new Date(b.updatedAt || b.createdAt).getTime() - new Date(a.updatedAt || a.createdAt).getTime());
+              const q = historySearch.trim().toLowerCase();
+              const filtered = q
+                ? history.filter(c =>
+                    (c.submitterUsername || '').toLowerCase().includes(q) ||
+                    (animeMap.get(c.animeId) || c.animeId).toLowerCase().includes(q) ||
+                    c.episodeTitle.toLowerCase().includes(q) ||
+                    c.fansubName.toLowerCase().includes(q)
+                  )
+                : history;
+              return (
+                <div className="space-y-3">
+                  <input
+                    type="text"
+                    value={historySearch}
+                    onChange={e => setHistorySearch(e.target.value)}
+                    placeholder="Kullanıcı, anime veya bölüm ara..."
+                    className="w-full bg-gray-900 border border-gray-700 rounded-xl px-4 py-2.5 text-sm text-white focus:border-amber-500 focus:outline-none"
+                  />
+                  {contributionsLoading ? (
+                    <div className="text-gray-500 text-sm text-center py-10">Yükleniyor...</div>
+                  ) : filtered.length === 0 ? (
+                    <div className="text-center py-12 text-gray-600 text-sm">{q ? 'Sonuç bulunamadı.' : 'Geçmiş işlem yok.'}</div>
+                  ) : filtered.map(c => (
+                    <div key={c.id} className="bg-[#18181b] border border-gray-800 rounded-xl p-4 space-y-1.5">
+                      <div className="flex items-start justify-between gap-3 flex-wrap">
+                        <div className="space-y-1 min-w-0 flex-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            {c.type === 'source'
+                              ? <span className="text-[10px] font-bold px-2 py-0.5 rounded-full border bg-purple-500/10 text-purple-400 border-purple-500/30">Kaynak</span>
+                              : <span className="text-[10px] font-bold px-2 py-0.5 rounded-full border bg-blue-500/10 text-blue-400 border-blue-500/30">Bölüm</span>
+                            }
+                            {c.status === 'approved'
+                              ? <span className="text-[10px] font-bold px-2 py-0.5 rounded-full border bg-green-500/10 text-green-400 border-green-500/30">Onaylandı</span>
+                              : <span className="text-[10px] font-bold px-2 py-0.5 rounded-full border bg-red-500/10 text-red-400 border-red-500/30">Reddedildi</span>
+                            }
+                          </div>
+                          <p className="text-sm text-white font-medium">Bölüm {c.episodeNumber}: {c.episodeTitle}</p>
+                          <p className="text-xs text-gray-500">
+                            <span className="text-gray-400 font-medium">{animeMap.get(c.animeId) || c.animeId}</span>
+                            &nbsp;·&nbsp;<span className="text-amber-400">{c.fansubName}</span>
+                            &nbsp;·&nbsp;{c.sources?.length || 0} kaynak
+                          </p>
+                          <p className="text-xs text-gray-600">
+                            Gönderen: <span className="text-gray-400 font-medium">{c.submitterUsername || c.submittedBy.slice(0, 8)}</span>
+                          </p>
+                          {c.adminNote && <p className="text-xs text-red-400 italic">Not: "{c.adminNote}"</p>}
+                        </div>
+                        <p className="text-[10px] text-gray-600 flex-shrink-0 whitespace-nowrap">
+                          {new Date(c.updatedAt || c.createdAt).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short', year: 'numeric' })}
+                        </p>
                       </div>
                     </div>
                   ))}

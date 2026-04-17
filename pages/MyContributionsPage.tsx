@@ -226,7 +226,7 @@ const MyContributionsPage = () => {
         {withPendingAction.length > 0 && (
           <div className="space-y-3">
             <h2 className="text-sm font-bold text-gray-400 uppercase tracking-wider">Değişiklik İstekleri</h2>
-            {withPendingAction.map(c => {renderCard(c)})}
+            {withPendingAction.map(c => renderCard(c))}
           </div>
         )}
 
@@ -236,7 +236,7 @@ const MyContributionsPage = () => {
               <span className="inline-block w-2 h-2 rounded-full bg-amber-500"></span>
               Onay Bekleyen ({pending.length})
             </h2>
-            {pending.map(c => {renderCard(c)})}
+            {pending.map(c => renderCard(c))}
           </div>
         )}
 
@@ -246,7 +246,7 @@ const MyContributionsPage = () => {
               <span className="inline-block w-2 h-2 rounded-full bg-green-500"></span>
               Onaylandı ({approved.length})
             </h2>
-            {approved.map(c => {renderCard(c)})}
+            {approved.map(c => renderCard(c))}
           </div>
         )}
 
@@ -256,7 +256,7 @@ const MyContributionsPage = () => {
               <span className="inline-block w-2 h-2 rounded-full bg-red-500"></span>
               Reddedildi ({rejected.length})
             </h2>
-            {rejected.map(c => {renderCard(c)})}
+            {rejected.map(c => renderCard(c))}
           </div>
         )}
       </div>

@@ -42,10 +42,20 @@ const Home = () => {
   const newEpisodes = [...animes].reverse().slice(0, 5);
   const recommended = animes.filter(a => a.genres.includes('Aksiyon') || a.genres.includes('Macera'));
 
-  // Mock "Continue Watching" based on user history (mocked implementation)
-  const continueWatching = user?.watchedEpisodes?.length 
-    ? animes.filter(a => a.episodes.some(e => user.watchedEpisodes!.includes(e.id))) 
-    : animes.slice(1, 3); // Fallback mock
+  // Continue watching — use localStorage last_ep per anime
+  const continueWatching = user
+    ? animes
+        .filter(a => localStorage.getItem(`last_ep_${user.id}_${a.id}`))
+        .map(a => {
+          const lastEpId = localStorage.getItem(`last_ep_${user.id}_${a.id}`)!;
+          const ep = a.episodes.find(e => e.id === lastEpId);
+          const seasons = [...new Set(a.episodes.map(e => e.season || 1))];
+          const multiSeason = seasons.length > 1;
+          const season = ep?.season || 1;
+          const seasonPrefix = multiSeason ? `${season}.S ` : '';
+          return { anime: a, lastEpId, epNumber: ep?.number ?? null, seasonPrefix };
+        })
+    : [];
 
   return (
     <div className="bg-[#0f0f10] min-h-screen pb-20">
@@ -59,8 +69,14 @@ const Home = () => {
         {/* Continue Watching */}
         {user && continueWatching.length > 0 && (
           <Section title="İzlemeye Devam Et" linkTo="/history">
-            {continueWatching.map(anime => (
-               <AnimeCard key={anime.id} anime={anime} variant="landscape" />
+            {continueWatching.map(({ anime, lastEpId, epNumber, seasonPrefix }) => (
+              <AnimeCard
+                key={anime.id}
+                anime={anime}
+                variant="landscape"
+                to={`/anime/${anime.id}/watch?ep=${lastEpId}`}
+                continueLabel={epNumber ? `${seasonPrefix}${epNumber}. Bölümden Devam Et` : 'Devam Et'}
+              />
             ))}
           </Section>
         )}

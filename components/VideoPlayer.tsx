@@ -1,10 +1,16 @@
 import React, { useState } from 'react';
-import { Play } from 'lucide-react';
+import { Play, ChevronLeft, ChevronRight } from 'lucide-react';
 
 interface VideoPlayerProps {
   embedUrl: string;
   poster?: string;
   onPlay?: () => void;
+  onPrev?: () => void;
+  onNext?: () => void;
+  hasPrev?: boolean;
+  hasNext?: boolean;
+  prevLabel?: string;
+  nextLabel?: string;
 }
 
 // If the input is raw <iframe> HTML, extract the src attribute value unchanged.
@@ -44,7 +50,7 @@ const extractSrc = (input: string): string => {
   return input;
 };
 
-const VideoPlayer: React.FC<VideoPlayerProps> = ({ embedUrl: raw, poster, onPlay }) => {
+const VideoPlayer: React.FC<VideoPlayerProps> = ({ embedUrl: raw, poster, onPlay, onPrev, onNext, hasPrev, hasNext, prevLabel, nextLabel }) => {
   const [isPlaying, setIsPlaying] = useState(false);
 
   const src = extractSrc(raw);
@@ -90,8 +96,8 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ embedUrl: raw, poster, onPlay
   }
 
   return (
-    <div className="space-y-2">
-      <div className="relative w-full pt-[56.25%] bg-black rounded-xl overflow-hidden shadow-2xl border border-gray-800">
+    <div className="space-y-0">
+      <div className="relative w-full pt-[56.25%] bg-black rounded-t-xl overflow-hidden shadow-2xl border border-gray-800 border-b-0">
         <iframe
           className="absolute top-0 left-0 w-full h-full border-0"
           src={src}
@@ -101,6 +107,24 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ embedUrl: raw, poster, onPlay
           allowFullScreen
           scrolling="no"
         />
+      </div>
+      <div className="flex border border-gray-800 rounded-b-xl overflow-hidden">
+        <button
+          onClick={onPrev}
+          disabled={!hasPrev}
+          className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-gray-900 hover:bg-gray-800 text-gray-400 hover:text-white transition-colors disabled:opacity-30 disabled:cursor-not-allowed border-r border-gray-800 text-xs font-bold"
+        >
+          <ChevronLeft size={16} />
+          <span className="truncate">{prevLabel || 'Önceki Bölüm'}</span>
+        </button>
+        <button
+          onClick={onNext}
+          disabled={!hasNext}
+          className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-gray-900 hover:bg-gray-800 text-gray-400 hover:text-white transition-colors disabled:opacity-30 disabled:cursor-not-allowed text-xs font-bold"
+        >
+          <span className="truncate">{nextLabel || 'Sonraki Bölüm'}</span>
+          <ChevronRight size={16} />
+        </button>
       </div>
     </div>
   );

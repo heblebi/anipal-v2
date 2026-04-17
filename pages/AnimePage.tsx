@@ -18,6 +18,7 @@ const AnimePage = () => {
 
   const [anime, setAnime] = useState<Anime | null>(null);
   const [loading, setLoading] = useState(true);
+  const [selectedSeason, setSelectedSeason] = useState<number>(1);
 
   // Anime entry / rating
   const [animeEntry, setAnimeEntry] = useState<{ status: string; rating: number; review: string } | null>(null);
@@ -103,7 +104,15 @@ const handleSaveEntry = async () => {
   if (loading) return <div className="text-center p-10 text-amber-500">Yükleniyor...</div>;
   if (!anime) return <div className="text-center p-10 text-red-500">Anime bulunamadı</div>;
 
-  const firstEpId = anime.episodes.length > 0 ? anime.episodes.sort((a, b) => a.number - b.number)[0].id : null;
+  const sortedEps = [...anime.episodes].sort((a, b) => a.number - b.number);
+  const firstEpId = sortedEps.length > 0 ? sortedEps[0].id : null;
+  const lastSeenEpId = user && id ? localStorage.getItem(`last_ep_${user.id}_${id}`) : null;
+  const watchEpId = lastSeenEpId && sortedEps.find(e => e.id === lastSeenEpId) ? lastSeenEpId : firstEpId;
+  // Initialize season from last seen ep (or first ep)
+  React.useEffect(() => {
+    const ep = sortedEps.find(e => e.id === watchEpId);
+    if (ep) setSelectedSeason(ep.season || 1);
+  }, [anime.id]);
 
   return (
     <div className="animate-in fade-in duration-500 bg-[#0f0f10] min-h-screen">
@@ -143,11 +152,11 @@ const handleSaveEntry = async () => {
             <div className="flex gap-2 flex-wrap items-center">
               {/* Watch button */}
               <button
-                onClick={() => firstEpId ? navigate(`/anime/${anime.id}/watch?ep=${firstEpId}`) : null}
-                disabled={!firstEpId}
+                onClick={() => watchEpId ? navigate(`/anime/${anime.id}/watch?ep=${watchEpId}`) : null}
+                disabled={!watchEpId}
                 className="flex items-center gap-2 px-5 py-2.5 bg-amber-500 hover:bg-amber-400 text-black font-bold rounded-full text-sm transition-all shadow-lg shadow-amber-500/20 disabled:opacity-40"
               >
-                <PlayCircle size={18} /> İzle
+                <PlayCircle size={18} /> {lastSeenEpId && sortedEps.find(e => e.id === lastSeenEpId) ? 'Devam Et' : 'İzle'}
               </button>
 
               {/* Add to list button */}
@@ -194,7 +203,7 @@ const handleSaveEntry = async () => {
               <span className="w-1 h-5 bg-amber-500 rounded-full inline-block" />
               Anime Hakkında
             </h2>
-            <p className="text-gray-300 leading-relaxed text-sm">{anime.description}</p>
+            <p className="text-gray-300 leading-relaxed text-sm">{anime.description.replace(/\s*\(Kaynak:[^)]*\)/gi, '').trim()}</p>
             <div className="mt-4 flex flex-wrap gap-2">
               {anime.genres.map(g => (
                 <span key={g} className="bg-gray-800 text-gray-300 px-3 py-1 rounded-full text-xs border border-gray-700">{g}</span>
@@ -203,7 +212,7 @@ const handleSaveEntry = async () => {
           </div>
 
           {/* Stats row */}
-          {(anime.averageRating || anime.ratingsCount) && (
+          {!!(anime.averageRating || anime.ratingsCount) && (
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
               {anime.averageRating ? (
                 <div className="bg-[#18181b] border border-gray-800 rounded-xl p-4 text-center">
@@ -267,46 +276,68 @@ const handleSaveEntry = async () => {
 
         {/* Right: Episode List */}
         <div className="lg:col-span-1">
-          <div className="bg-[#18181b] rounded-xl border border-gray-800 overflow-hidden lg:sticky lg:top-24">
-            <div className="p-4 border-b border-gray-800 bg-gray-900/50 flex items-center justify-between">
-              <h3 className="font-bold text-white flex items-center gap-2">
-                <List className="text-amber-500" size={18} />
-                Bölümler ({anime.episodes.length})
-              </h3>
-            </div>
+          {(() => {
+            const seasons = [...new Set(anime.episodes.map(e => e.season || 1))].sort((a, b) => a - b);
+            const multiSeason = seasons.length > 1;
+            const filteredEps = [...anime.episodes].filter(e => (e.season || 1) === selectedSeason).sort((a, b) => a.number - b.number);
+            return (
+              <div className="bg-[#18181b] rounded-xl border border-gray-800 overflow-hidden lg:sticky lg:top-24">
+                <div className="p-4 border-b border-gray-800 bg-gray-900/50 flex items-center justify-between">
+                  <h3 className="font-bold text-white flex items-center gap-2">
+                    <List className="text-amber-500" size={18} />
+                    Bölümler ({anime.episodes.length})
+                  </h3>
+                </div>
 
-            <div className="max-h-[50vh] sm:max-h-[60vh] lg:max-h-[70vh] overflow-y-auto custom-scrollbar">
-              {anime.episodes.length === 0 ? (
-                <div className="p-6 text-center text-gray-500 text-sm">Henüz bölüm eklenmemiş.</div>
-              ) : (
-                [...anime.episodes].sort((a, b) => a.number - b.number).map(ep => (
-                  <Link
-                    key={ep.id}
-                    to={`/anime/${anime.id}/watch?ep=${ep.id}`}
-                    className="flex items-center gap-3 p-3 sm:p-4 border-b border-gray-800/50 hover:bg-gray-800 transition-colors group"
-                  >
-                    {ep.thumbnail ? (
-                      <img src={ep.thumbnail} className="w-16 h-10 object-cover rounded flex-shrink-0" alt="" />
-                    ) : (
-                      <div className="w-10 h-10 bg-gray-800 rounded-lg flex items-center justify-center flex-shrink-0 group-hover:bg-amber-500/10 transition-colors">
-                        <span className="text-base font-black text-gray-600 group-hover:text-amber-500">{ep.number}</span>
-                      </div>
-                    )}
-                    <div className="flex-1 min-w-0">
-                      <div className="text-sm font-bold text-gray-200 group-hover:text-white line-clamp-1">
-                        {ep.number}. {ep.title}
-                      </div>
-                      {ep.fansub && <div className="text-xs text-amber-500/80">{ep.fansub}</div>}
-                      {ep.sources && ep.sources.length > 1 && (
-                        <div className="text-xs text-gray-600">{ep.sources.length} oynatıcı</div>
-                      )}
-                    </div>
-                    <PlayCircle size={16} className="text-gray-700 group-hover:text-amber-500 flex-shrink-0 transition-colors" />
-                  </Link>
-                ))
-              )}
-            </div>
-          </div>
+                {/* Season Tabs */}
+                {multiSeason && (
+                  <div className="flex gap-1 p-2 border-b border-gray-800 overflow-x-auto custom-scrollbar bg-gray-900/30 flex-nowrap">
+                    {seasons.map(s => (
+                      <button
+                        key={s}
+                        onClick={() => setSelectedSeason(s)}
+                        className={`flex-shrink-0 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${selectedSeason === s ? 'bg-amber-500 text-black' : 'bg-gray-800 text-gray-400 hover:bg-gray-700 hover:text-white'}`}
+                      >
+                        {s}. Sezon
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                <div className="max-h-[50vh] sm:max-h-[60vh] lg:max-h-[70vh] overflow-y-auto custom-scrollbar">
+                  {filteredEps.length === 0 ? (
+                    <div className="p-6 text-center text-gray-500 text-sm">Henüz bölüm eklenmemiş.</div>
+                  ) : (
+                    filteredEps.map(ep => (
+                      <Link
+                        key={ep.id}
+                        to={`/anime/${anime.id}/watch?ep=${ep.id}`}
+                        className="flex items-center gap-3 p-3 sm:p-4 border-b border-gray-800/50 hover:bg-gray-800 transition-colors group"
+                      >
+                        {ep.thumbnail ? (
+                          <img src={ep.thumbnail} className="w-16 h-10 object-cover rounded flex-shrink-0" alt="" />
+                        ) : (
+                          <div className="w-10 h-10 bg-gray-800 rounded-lg flex items-center justify-center flex-shrink-0 group-hover:bg-amber-500/10 transition-colors">
+                            <span className="text-base font-black text-gray-600 group-hover:text-amber-500">{ep.number}</span>
+                          </div>
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm font-bold text-gray-200 group-hover:text-white line-clamp-1">
+                            {ep.number}. {ep.title}
+                          </div>
+                          {ep.fansub && <div className="text-xs text-amber-500/80">{ep.fansub}</div>}
+                          {ep.sources && ep.sources.length > 1 && (
+                            <div className="text-xs text-gray-600">{ep.sources.length} oynatıcı</div>
+                          )}
+                        </div>
+                        <PlayCircle size={16} className="text-gray-700 group-hover:text-amber-500 flex-shrink-0 transition-colors" />
+                      </Link>
+                    ))
+                  )}
+                </div>
+              </div>
+            );
+          })()}
         </div>
       </div>
 
