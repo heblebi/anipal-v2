@@ -109,6 +109,7 @@ export enum AnimeStatus {
 export interface Anime {
   id: string;
   title: string;
+  alternativeTitles?: string[];
   description: string;
   coverImage: string;
   bannerImage?: string;

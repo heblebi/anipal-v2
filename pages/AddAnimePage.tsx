@@ -51,6 +51,8 @@ const AddAnimePage = () => {
   // Anime fields
   const [fetchTitle, setFetchTitle] = useState('');
   const [title, setTitle] = useState('');
+  const [alternativeTitles, setAlternativeTitles] = useState<string[]>([]);
+  const [altTitleInput, setAltTitleInput] = useState('');
   const [desc, setDesc] = useState('');
   const [cover, setCover] = useState('');
   const [banner, setBanner] = useState('');
@@ -263,7 +265,7 @@ const AddAnimePage = () => {
           fansub: r.fansubs[0]?.name || '',
         }))
       );
-      await createAnimeWithEpisodes({ title, description: desc, coverImage: cover, bannerImage: banner, genres: genres.split(',').map(g => g.trim()).filter(Boolean), characters }, eps, user);
+      await createAnimeWithEpisodes({ title, alternativeTitles, description: desc, coverImage: cover, bannerImage: banner, genres: genres.split(',').map(g => g.trim()).filter(Boolean), characters }, eps, user);
       const successMsg = isModerator
         ? 'Anime onaya gönderildi. Yönetici onayladıktan sonra yayına alınacak.'
         : 'Anime başarıyla yayınlandı!';
@@ -324,6 +326,40 @@ const AddAnimePage = () => {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="sm:col-span-2">
               <Input label="Anime Başlığı *" value={title} onChange={e => setTitle(e.target.value)} required />
+            </div>
+            <div className="sm:col-span-2 space-y-2">
+              <label className="text-sm font-medium text-gray-300">Alternatif İsimler <span className="text-gray-500 font-normal">(opsiyonel — arama için)</span></label>
+              <div className="flex gap-2">
+                <input
+                  className="flex-1 bg-gray-800 border border-gray-700 rounded-xl px-3 py-2 text-white text-sm focus:border-amber-500 focus:outline-none"
+                  placeholder="ör. Shingeki no Kyojin"
+                  value={altTitleInput}
+                  onChange={e => setAltTitleInput(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      const v = altTitleInput.trim();
+                      if (v && !alternativeTitles.includes(v)) setAlternativeTitles(p => [...p, v]);
+                      setAltTitleInput('');
+                    }
+                  }}
+                />
+                <button type="button" onClick={() => {
+                  const v = altTitleInput.trim();
+                  if (v && !alternativeTitles.includes(v)) setAlternativeTitles(p => [...p, v]);
+                  setAltTitleInput('');
+                }} className="px-3 py-2 bg-gray-700 hover:bg-gray-600 text-white text-sm rounded-xl">Ekle</button>
+              </div>
+              {alternativeTitles.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {alternativeTitles.map(t => (
+                    <span key={t} className="flex items-center gap-1 bg-gray-800 border border-gray-700 text-gray-300 text-xs px-2 py-1 rounded-lg">
+                      {t}
+                      <button type="button" onClick={() => setAlternativeTitles(p => p.filter(x => x !== t))} className="text-gray-500 hover:text-red-400">×</button>
+                    </span>
+                  ))}
+                </div>
+              )}
             </div>
             <Input label="Kapak Görseli URL *" value={cover} onChange={e => setCover(e.target.value)} required />
             <Input label="Banner Görseli URL (Opsiyonel)" value={banner} onChange={e => setBanner(e.target.value)} />

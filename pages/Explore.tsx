@@ -41,7 +41,10 @@ const Explore = () => {
     // Search
     if (search.trim()) {
       const q = search.toLowerCase();
-      result = result.filter(a => a.title.toLowerCase().includes(q));
+      result = result.filter(a =>
+        a.title.toLowerCase().includes(q) ||
+        (a.alternativeTitles || []).some(t => t.toLowerCase().includes(q))
+      );
     }
 
     // Episode range

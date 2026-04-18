@@ -168,6 +168,7 @@ const mapProfile = (p: any, email?: string): User => ({
 const mapAnime = (a: any): Anime => ({
     id: a.id,
     title: a.title,
+    alternativeTitles: a.alternative_titles || [],
     description: a.description || '',
     coverImage: a.cover_image || '',
     bannerImage: a.banner_image || '',
@@ -681,6 +682,7 @@ export const getAnimeById = async (id: string): Promise<Anime | null> => {
 export const createAnime = async (animeData: any, user: User): Promise<Anime> => {
     const { data, error } = await supabase.from('animes').insert({
         title: animeData.title,
+        alternative_titles: animeData.alternativeTitles || [],
         description: animeData.description || '',
         cover_image: animeData.coverImage || '',
         banner_image: animeData.bannerImage || '',
@@ -698,6 +700,7 @@ export const createAnimeWithEpisodes = async (animeData: any, episodesData: any[
     const episodes = episodesData.map((ep, i) => ({ ...ep, id: `ep-${Date.now()}-${i}`, likes: 0 }));
     const { data, error } = await supabase.from('animes').insert({
         title: animeData.title,
+        alternative_titles: animeData.alternativeTitles || [],
         description: animeData.description || '',
         cover_image: animeData.coverImage || '',
         banner_image: animeData.bannerImage || '',
@@ -724,6 +727,7 @@ export const deleteAnime = async (animeId: string) => {
 export const updateAnime = async (animeId: string, data: Partial<Anime>) => {
     const update: any = {};
     if (data.title !== undefined) update.title = data.title;
+    if (data.alternativeTitles !== undefined) update.alternative_titles = data.alternativeTitles;
     if (data.description !== undefined) update.description = data.description;
     if ((data as any).coverImage !== undefined) update.cover_image = (data as any).coverImage;
     if ((data as any).bannerImage !== undefined) update.banner_image = (data as any).bannerImage;
