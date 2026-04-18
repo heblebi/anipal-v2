@@ -66,6 +66,14 @@ const ManagePanel = () => {
   const [editingEp, setEditingEp] = useState<EditingEp | null>(null);
   const [epSaving, setEpSaving] = useState(false);
 
+  // Anime edit
+  const [editingAnime, setEditingAnime] = useState<Anime | null>(null);
+  const [animeEditForm, setAnimeEditForm] = useState({ title: '', description: '', coverImage: '', bannerImage: '' });
+  const [animeEditGenres, setAnimeEditGenres] = useState<string[]>([]);
+  const [animeEditAltTitles, setAnimeEditAltTitles] = useState<string[]>([]);
+  const [animeEditAltInput, setAnimeEditAltInput] = useState('');
+  const [animeSaving, setAnimeSaving] = useState(false);
+
   // Anime form
   const [animeForm, setAnimeForm] = useState({ title: '', description: '', coverImage: '', bannerImage: '' });
   const [selectedGenres, setSelectedGenres] = useState<string[]>([]);
@@ -152,6 +160,34 @@ const ManagePanel = () => {
     } finally {
       setAddingAnime(false);
     }
+  };
+
+  const openEditAnime = (anime: Anime) => {
+    setEditingAnime(anime);
+    setAnimeEditForm({ title: anime.title, description: anime.description, coverImage: anime.coverImage, bannerImage: anime.bannerImage || '' });
+    setAnimeEditGenres(anime.genres || []);
+    setAnimeEditAltTitles(anime.alternativeTitles || []);
+    setAnimeEditAltInput('');
+  };
+
+  const saveEditAnime = async () => {
+    if (!editingAnime) return;
+    setAnimeSaving(true);
+    try {
+      await updateAnime(editingAnime.id, {
+        title: animeEditForm.title,
+        alternativeTitles: animeEditAltTitles,
+        description: animeEditForm.description,
+        coverImage: animeEditForm.coverImage,
+        bannerImage: animeEditForm.bannerImage,
+        genres: animeEditGenres,
+      } as any);
+      showMsg('success', 'Anime güncellendi.');
+      setEditingAnime(null);
+      loadAnimes();
+      if (tab === 'all') loadAllAnimes();
+    } catch { showMsg('error', 'Güncellenemedi.'); }
+    finally { setAnimeSaving(false); }
   };
 
   const handleDeleteAnime = async (id: string, title: string) => {
@@ -426,6 +462,9 @@ const ManagePanel = () => {
                       className="px-2.5 py-1.5 text-xs font-bold rounded-lg bg-amber-500/10 text-amber-400 border border-amber-500/30 hover:bg-amber-500/20 transition-colors whitespace-nowrap">
                       + Bölüm
                     </button>
+                    <button onClick={() => openEditAnime(anime)} className="p-2 text-amber-400 hover:text-amber-300">
+                      <Pencil size={16} />
+                    </button>
                     <button onClick={() => setExpandedId(expandedId === anime.id ? null : anime.id)}
                       className="p-2 text-gray-400 hover:text-white">
                       {expandedId === anime.id ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
@@ -541,6 +580,9 @@ const ManagePanel = () => {
                   <p className="font-bold text-white text-sm truncate">{anime.title}</p>
                   <p className="text-xs text-gray-500">{anime.episodes.length} bölüm</p>
                 </div>
+                <button onClick={() => openEditAnime(anime)} className="p-2 text-amber-400 hover:text-amber-300 flex-shrink-0">
+                  <Pencil size={15} />
+                </button>
                 <button
                   onClick={() => navigate(`/contribute/${anime.id}`)}
                   className="px-3 py-1.5 text-xs font-bold rounded-lg bg-amber-500/10 text-amber-400 border border-amber-500/30 hover:bg-amber-500/20 transition-colors whitespace-nowrap flex-shrink-0"
@@ -635,6 +677,82 @@ const ManagePanel = () => {
           </div>
         )}
       </div>
+
+      {/* ── Anime Edit Modal ── */}
+      {editingAnime && (
+        <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
+          <div className="bg-[#18181b] border border-gray-700 rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between p-5 border-b border-gray-800">
+              <h3 className="font-bold text-white">Anime Düzenle</h3>
+              <button onClick={() => setEditingAnime(null)} className="text-gray-400 hover:text-white"><X size={20} /></button>
+            </div>
+            <div className="p-5 space-y-4">
+              <Input label="Görünen Ad *" value={animeEditForm.title} onChange={e => setAnimeEditForm(f => ({ ...f, title: e.target.value }))} />
+              <div className="space-y-2">
+                <label className="text-xs font-semibold text-gray-400">Alternatif İsimler <span className="font-normal text-gray-600">(arama için)</span></label>
+                <div className="flex gap-2">
+                  <input
+                    className="flex-1 bg-gray-900 border border-gray-700 rounded-xl px-3 py-2 text-sm text-white focus:border-amber-500 focus:outline-none"
+                    placeholder="ör. Shingeki no Kyojin"
+                    value={animeEditAltInput}
+                    onChange={e => setAnimeEditAltInput(e.target.value)}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        const v = animeEditAltInput.trim();
+                        if (v && !animeEditAltTitles.includes(v)) setAnimeEditAltTitles(p => [...p, v]);
+                        setAnimeEditAltInput('');
+                      }
+                    }}
+                  />
+                  <button type="button" onClick={() => {
+                    const v = animeEditAltInput.trim();
+                    if (v && !animeEditAltTitles.includes(v)) setAnimeEditAltTitles(p => [...p, v]);
+                    setAnimeEditAltInput('');
+                  }} className="px-3 py-2 bg-gray-700 hover:bg-gray-600 text-white text-sm rounded-xl">Ekle</button>
+                </div>
+                {animeEditAltTitles.length > 0 && (
+                  <div className="flex flex-wrap gap-2">
+                    {animeEditAltTitles.map(t => (
+                      <span key={t} className="flex items-center gap-1 bg-gray-800 border border-gray-700 text-gray-300 text-xs px-2 py-1 rounded-lg">
+                        {t}
+                        <button type="button" onClick={() => setAnimeEditAltTitles(p => p.filter(x => x !== t))} className="text-gray-500 hover:text-red-400">×</button>
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-400 mb-1">Açıklama</label>
+                <textarea value={animeEditForm.description} onChange={e => setAnimeEditForm(f => ({ ...f, description: e.target.value }))}
+                  className="w-full bg-gray-900 border border-gray-700 rounded-xl px-4 py-3 text-sm text-white resize-none focus:outline-none focus:border-amber-500"
+                  rows={4} />
+              </div>
+              <Input label="Kapak Görseli URL" value={animeEditForm.coverImage} onChange={e => setAnimeEditForm(f => ({ ...f, coverImage: e.target.value }))} />
+              <Input label="Banner Görseli URL" value={animeEditForm.bannerImage} onChange={e => setAnimeEditForm(f => ({ ...f, bannerImage: e.target.value }))} />
+              <div>
+                <label className="block text-xs font-semibold text-gray-400 mb-2">Türler</label>
+                <div className="flex flex-wrap gap-2">
+                  {GENRES.map(g => (
+                    <button key={g} type="button"
+                      onClick={() => setAnimeEditGenres(prev => prev.includes(g) ? prev.filter(x => x !== g) : [...prev, g])}
+                      className={`px-3 py-1 text-xs rounded-full border transition-colors ${animeEditGenres.includes(g) ? 'bg-amber-500 text-black border-amber-500' : 'border-gray-700 text-gray-400 hover:border-amber-500 hover:text-amber-500'}`}>
+                      {g}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+            <div className="p-5 border-t border-gray-800 flex gap-3">
+              <Button variant="secondary" className="flex-1" onClick={() => setEditingAnime(null)}>İptal</Button>
+              <Button variant="primary" className="flex-1" onClick={saveEditAnime} disabled={animeSaving}>
+                {animeSaving ? <Loader2 size={16} className="animate-spin inline mr-1" /> : <Save size={16} className="inline mr-1" />}
+                Kaydet
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Episode Edit Modal ── */}
       {editingEp && (
