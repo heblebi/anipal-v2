@@ -688,7 +688,7 @@ const Layout = ({ children }: { children?: React.ReactNode }) => {
             <div>
                 <h4 className="font-bold text-white mb-4">Topluluk</h4>
                 <ul className="space-y-2 text-sm text-gray-500">
-                    <li><a href="#" className="hover:text-amber-500">Discord</a></li>
+                    <li><a href="https://discord.gg/dWSyuYPv4K" target="_blank" rel="noopener noreferrer" className="hover:text-amber-500">Discord</a></li>
                     <li><Link to="/request" className="hover:text-amber-500">İstek / Öneri</Link></li>
                     <li><Link to="/privacy" className="hover:text-amber-500">Gizlilik Politikası</Link></li>
                 </ul>
