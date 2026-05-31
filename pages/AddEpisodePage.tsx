@@ -87,18 +87,14 @@ function sheetCsvToSeasonSections(csvText: string): SeasonSection[] {
     rows.push({ season, number, title, translator, lang: lang.toLowerCase(), player, url });
   }
 
-  // TR priority: same (season, number, translator, player) → keep TR if available
-  const groups = new Map<string, RawRow[]>();
-  for (const r of rows) {
+  // Deduplicate: same (season, number, translator, player) → keep only first
+  const seen = new Set<string>();
+  const filtered: RawRow[] = rows.filter(r => {
     const k = `${r.season}|${r.number}|${r.translator}|${r.player}`;
-    if (!groups.has(k)) groups.set(k, []);
-    groups.get(k)!.push(r);
-  }
-  const filtered: RawRow[] = [];
-  for (const g of groups.values()) {
-    const tr = g.filter(r => r.lang === 'tr');
-    filtered.push(...(tr.length > 0 ? tr : g));
-  }
+    if (seen.has(k)) return false;
+    seen.add(k);
+    return true;
+  });
 
   // Build episode map grouped by season→episode
   const epMap = new Map<string, { season: number; number: number; title: string; fansubMap: Map<string, SourceRow[]> }>();

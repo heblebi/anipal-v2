@@ -14,7 +14,7 @@ interface EmbedResult {
 import { UserRole, AnimeCharacter } from '../types';
 import Input from '../components/Input';
 import Button from '../components/Button';
-import { Plus, Trash2, ArrowLeft, Sparkles, Globe, CheckCircle2, AlertCircle, Loader2, Layers } from 'lucide-react';
+import { Plus, Trash2, ArrowLeft, Sparkles, Globe, CheckCircle2, AlertCircle, Loader2, Layers, FileSpreadsheet } from 'lucide-react';
 
 interface SourceRow { id: string; name: string; url: string; }
 interface FansubRow { id: string; name: string; sources: SourceRow[]; }
@@ -43,6 +43,94 @@ const parseVideoLink = (url: string): { embedUrl: string; thumbnail: string; nam
   return { name: 'Diğer', embedUrl: url, thumbnail: '' };
 };
 
+// --- Google Sheets import helpers ---
+function parseCSVLine(line: string): string[] {
+  const result: string[] = [];
+  let current = '';
+  let inQuotes = false;
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (ch === '"') {
+      if (inQuotes && line[i + 1] === '"') { current += '"'; i++; }
+      else inQuotes = !inQuotes;
+    } else if (ch === ',' && !inQuotes) {
+      result.push(current.trim());
+      current = '';
+    } else {
+      current += ch;
+    }
+  }
+  result.push(current.trim());
+  return result;
+}
+
+function extractSheetId(url: string): string | null {
+  const m = url.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
+  return m ? m[1] : null;
+}
+
+function sheetCsvToSeasonSections(csvText: string): SeasonSection[] {
+  const lines = csvText.split('\n').map(l => l.replace(/\r$/, '')).filter(Boolean);
+  if (!lines.length) return [];
+
+  interface RawRow { season: number; number: number; title: string; translator: string; player: string; url: string; }
+  const rows: RawRow[] = [];
+  for (const line of lines) {
+    const cols = parseCSVLine(line);
+    if (cols.length < 8) continue;
+    const [, seasonStr, numStr, title, translator, , player, url] = cols;
+    const season = parseInt(seasonStr);
+    const number = parseInt(numStr);
+    if (isNaN(season) || isNaN(number) || !url) continue;
+    rows.push({ season, number, title, translator, player, url });
+  }
+
+  // Deduplicate: same (season, number, translator, player) → keep only first
+  const seen = new Set<string>();
+  const filtered = rows.filter(r => {
+    const k = `${r.season}|${r.number}|${r.translator}|${r.player}`;
+    if (seen.has(k)) return false;
+    seen.add(k);
+    return true;
+  });
+
+  const epMap = new Map<string, { season: number; number: number; title: string; fansubMap: Map<string, { name: string; url: string }[]> }>();
+  for (const r of filtered) {
+    const k = `${r.season}-${r.number}`;
+    if (!epMap.has(k)) epMap.set(k, { season: r.season, number: r.number, title: r.title, fansubMap: new Map() });
+    const ep = epMap.get(k)!;
+    if (!ep.fansubMap.has(r.translator)) ep.fansubMap.set(r.translator, []);
+    ep.fansubMap.get(r.translator)!.push({ name: r.player, url: r.url });
+  }
+
+  const seasonMap = new Map<number, EpisodeRow[]>();
+  for (const ep of epMap.values()) {
+    if (!seasonMap.has(ep.season)) seasonMap.set(ep.season, []);
+    const rowId = `ep-${ep.season}-${ep.number}-${Date.now()}`;
+    const fansubs: FansubRow[] = Array.from(ep.fansubMap.entries()).map(([name, srcs]) => ({
+      id: `fb-${Date.now()}-${Math.random()}`,
+      name,
+      sources: srcs.map(s => ({ id: `s-${Date.now()}-${Math.random()}`, name: s.name, url: s.url })),
+    }));
+    seasonMap.get(ep.season)!.push({
+      id: rowId,
+      number: String(ep.number),
+      title: ep.title,
+      thumbnail: '',
+      fansubs: fansubs.length > 0 ? fansubs : [newFansubRow(rowId)],
+    });
+  }
+
+  return Array.from(seasonMap.entries())
+    .sort((a, b) => a[0] - b[0])
+    .map(([num, episodes]) => ({
+      id: `season-${num}-${Date.now()}`,
+      number: num,
+      episodes: episodes.sort((a, b) => parseInt(a.number) - parseInt(b.number)),
+    }));
+}
+// --- end helpers ---
+
 const AddAnimePage = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -67,6 +155,10 @@ const AddAnimePage = () => {
   const [epFetchLoading, setEpFetchLoading] = useState(false);
   const [msg, setMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
+  const [sheetsUrl, setSheetsUrl] = useState('');
+  const [sheetsLoading, setSheetsLoading] = useState(false);
+  const [sheetsMsg, setSheetsMsg] = useState('');
+
   // Per-section MAL fetch
   const [secMalId, setSecMalId] = useState<Record<string, string>>({});
   const [secMalLoading, setSecMalLoading] = useState<Record<string, boolean>>({});
@@ -75,6 +167,27 @@ const AddAnimePage = () => {
   const [rowEmbedUrl, setRowEmbedUrl] = useState<Record<string, string>>({});
   const [rowEmbedLoading, setRowEmbedLoading] = useState<Record<string, boolean>>({});
   const [rowEmbedStatus, setRowEmbedStatus] = useState<Record<string, 'ok' | 'error' | null>>({});
+
+  const handleImportSheets = async () => {
+    const sheetId = extractSheetId(sheetsUrl.trim());
+    if (!sheetId) { setSheetsMsg('Hata: Geçerli bir Google Sheets linki değil.'); return; }
+    setSheetsLoading(true);
+    setSheetsMsg('');
+    try {
+      const res = await fetch(`https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:csv`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const text = await res.text();
+      const sections = sheetCsvToSeasonSections(text);
+      if (!sections.length) { setSheetsMsg('Hata: Tabloda uygun veri bulunamadı.'); return; }
+      setSeasonSections(sections);
+      const totalEps = sections.reduce((t, s) => t + s.episodes.length, 0);
+      setSheetsMsg(`${sections.length} sezon, ${totalEps} bölüm aktarıldı!`);
+    } catch (e: any) {
+      setSheetsMsg('Hata: ' + (e.message || 'Tablo çekilemedi. Tablonun herkese açık olduğundan emin ol.'));
+    } finally {
+      setSheetsLoading(false);
+    }
+  };
 
   const handleFetch = async () => {
     if (!fetchTitle.trim()) return;
@@ -386,6 +499,41 @@ const AddAnimePage = () => {
                 {genres && <p className="text-xs text-gray-500 mt-0.5">{genres}</p>}
               </div>
             </div>
+          )}
+        </div>
+
+        {/* Google Sheets Import */}
+        <div className="bg-[#18181b] border border-green-900/40 rounded-2xl p-4 sm:p-6 space-y-3">
+          <h2 className="text-base font-bold text-white flex items-center gap-2">
+            <FileSpreadsheet size={16} className="text-green-400" /> Google Sheets'ten Bölüm Aktar
+          </h2>
+          <p className="text-xs text-gray-500">
+            Sütun sırası: Anime, Sezon, Bölüm, Bölüm Adı, Çevirmen, Dil, Oynatıcı, Embed Link
+            &nbsp;—&nbsp;Aynı fansub'da aynı oynatıcı için sadece ilk link alınır.
+          </p>
+          <div className="flex gap-2">
+            <input
+              type="url"
+              placeholder="https://docs.google.com/spreadsheets/d/..."
+              value={sheetsUrl}
+              onChange={e => setSheetsUrl(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), handleImportSheets())}
+              className="flex-1 bg-gray-800 border border-gray-700 rounded-xl px-3 py-2.5 text-white text-sm focus:border-green-500 focus:outline-none"
+            />
+            <button
+              type="button"
+              onClick={handleImportSheets}
+              disabled={sheetsLoading || !sheetsUrl.trim()}
+              className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-500 disabled:opacity-50 text-white font-bold text-sm rounded-xl transition-colors flex-shrink-0"
+            >
+              {sheetsLoading ? <Loader2 size={14} className="animate-spin" /> : <FileSpreadsheet size={14} />}
+              Aktar
+            </button>
+          </div>
+          {sheetsMsg && (
+            <p className={`text-xs font-medium ${sheetsMsg.startsWith('Hata') ? 'text-red-400' : 'text-green-400'}`}>
+              {sheetsMsg}
+            </p>
           )}
         </div>
 
