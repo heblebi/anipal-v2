@@ -102,8 +102,9 @@ function sheetCsvToSeasonSections(csvText: string): SeasonSection[] {
     const k = `${r.season}-${r.number}`;
     if (!epMap.has(k)) epMap.set(k, { season: r.season, number: r.number, title: r.title, fansubMap: new Map() });
     const ep = epMap.get(k)!;
-    if (!ep.fansubMap.has(r.translator)) ep.fansubMap.set(r.translator, []);
-    ep.fansubMap.get(r.translator)!.push({ id: `s-${Date.now()}-${Math.random()}`, name: r.player, url: r.url });
+    const fansubName = r.translator.trim() || 'Bilinmiyor';
+    if (!ep.fansubMap.has(fansubName)) ep.fansubMap.set(fansubName, []);
+    ep.fansubMap.get(fansubName)!.push({ id: `s-${Date.now()}-${Math.random()}`, name: r.player, url: r.url });
   }
 
   const seasonMap = new Map<number, EpisodeRow[]>();
@@ -179,7 +180,15 @@ const AddEpisodePage = () => {
       const text = await res.text();
       const sections = sheetCsvToSeasonSections(text);
       if (!sections.length) { setSheetsMsg('Hata: Tabloda uygun veri bulunamadı.'); return; }
-      setSeasonSections(sections);
+      // Mevcut episode'lardan thumbnail'ları koru
+      setSeasonSections(prev => {
+        const thumbMap = new Map<string, string>();
+        prev.forEach(s => s.episodes.forEach(e => { if (e.thumbnail) thumbMap.set(`${s.number}-${e.number}`, e.thumbnail); }));
+        return sections.map(s => ({
+          ...s,
+          episodes: s.episodes.map(e => ({ ...e, thumbnail: thumbMap.get(`${s.number}-${e.number}`) || e.thumbnail })),
+        }));
+      });
       const totalEps = sections.reduce((t, s) => t + s.episodes.length, 0);
       setSheetsMsg(`${sections.length} sezon, ${totalEps} bölüm başarıyla içe aktarıldı!`);
     } catch (e: any) {
