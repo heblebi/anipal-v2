@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { getAnimes, addEpisodes, fetchAllSeasons, fetchMALEpisodes } from '../services/mockBackend';
 import { UserRole, Anime } from '../types';
 import Button from '../components/Button';
-import { Plus, Trash2, ArrowLeft, Globe, CheckCircle2, AlertCircle, Loader2, X, Layers, Download } from 'lucide-react';
+import { Plus, Trash2, ArrowLeft, Globe, CheckCircle2, AlertCircle, Loader2, X, Layers, Download, FileSpreadsheet } from 'lucide-react';
 
 interface SourceRow { id: string; name: string; url: string; }
 interface FansubRow { id: string; name: string; sources: SourceRow[]; }
@@ -38,6 +38,104 @@ const parseVideoLink = (url: string) => {
   return { name: 'Diğer', embedUrl: url, thumbnail: '' };
 };
 
+// --- Google Sheets import helpers ---
+
+function parseCSVLine(line: string): string[] {
+  const result: string[] = [];
+  let current = '';
+  let inQuotes = false;
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (ch === '"') {
+      if (inQuotes && line[i + 1] === '"') { current += '"'; i++; }
+      else inQuotes = !inQuotes;
+    } else if (ch === ',' && !inQuotes) {
+      result.push(current.trim());
+      current = '';
+    } else {
+      current += ch;
+    }
+  }
+  result.push(current.trim());
+  return result;
+}
+
+function extractSheetId(url: string): string | null {
+  const m = url.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
+  return m ? m[1] : null;
+}
+
+function sheetCsvToSeasonSections(csvText: string): SeasonSection[] {
+  const lines = csvText.split('\n').map(l => l.replace(/\r$/, '')).filter(Boolean);
+  if (!lines.length) return [];
+
+  // skip header rows (first col not a number)
+  const dataLines = lines.filter(l => {
+    const first = parseCSVLine(l)[1];
+    return first !== undefined && !isNaN(parseInt(first));
+  });
+
+  interface RawRow { season: number; number: number; title: string; translator: string; lang: string; player: string; url: string; }
+  const rows: RawRow[] = [];
+  for (const line of dataLines) {
+    const cols = parseCSVLine(line);
+    if (cols.length < 8) continue;
+    const [, seasonStr, numStr, title, translator, lang, player, url] = cols;
+    const season = parseInt(seasonStr);
+    const number = parseInt(numStr);
+    if (isNaN(season) || isNaN(number) || !url) continue;
+    rows.push({ season, number, title, translator, lang: lang.toLowerCase(), player, url });
+  }
+
+  // TR priority: same (season, number, translator, player) → keep TR if available
+  const groups = new Map<string, RawRow[]>();
+  for (const r of rows) {
+    const k = `${r.season}|${r.number}|${r.translator}|${r.player}`;
+    if (!groups.has(k)) groups.set(k, []);
+    groups.get(k)!.push(r);
+  }
+  const filtered: RawRow[] = [];
+  for (const g of groups.values()) {
+    const tr = g.filter(r => r.lang === 'tr');
+    filtered.push(...(tr.length > 0 ? tr : g));
+  }
+
+  // Build episode map grouped by season→episode
+  const epMap = new Map<string, { season: number; number: number; title: string; fansubMap: Map<string, SourceRow[]> }>();
+  for (const r of filtered) {
+    const k = `${r.season}-${r.number}`;
+    if (!epMap.has(k)) epMap.set(k, { season: r.season, number: r.number, title: r.title, fansubMap: new Map() });
+    const ep = epMap.get(k)!;
+    if (!ep.fansubMap.has(r.translator)) ep.fansubMap.set(r.translator, []);
+    ep.fansubMap.get(r.translator)!.push({ id: `s-${Date.now()}-${Math.random()}`, name: r.player, url: r.url });
+  }
+
+  const seasonMap = new Map<number, EpisodeRow[]>();
+  for (const ep of epMap.values()) {
+    if (!seasonMap.has(ep.season)) seasonMap.set(ep.season, []);
+    const fansubs: FansubRow[] = Array.from(ep.fansubMap.entries()).map(([name, sources]) => ({
+      id: `fb-${Date.now()}-${Math.random()}`,
+      name,
+      sources,
+    }));
+    seasonMap.get(ep.season)!.push({
+      id: `${Date.now()}-${Math.random()}`,
+      number: String(ep.number),
+      title: ep.title,
+      thumbnail: '',
+      fansubs: fansubs.length > 0 ? fansubs : [newFansub()],
+    });
+  }
+
+  return Array.from(seasonMap.entries())
+    .sort((a, b) => a[0] - b[0])
+    .map(([num, episodes]) => ({
+      id: `season-${num}-${Date.now()}`,
+      number: num,
+      episodes: episodes.sort((a, b) => parseInt(a.number) - parseInt(b.number)),
+    }));
+}
+
 const AddEpisodePage = () => {
   const { id: animeId } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -52,6 +150,9 @@ const AddEpisodePage = () => {
   const [msg, setMsg] = useState('');
   const [anilistId, setAnilistId] = useState('');
   const [malFetchLoading, setMalFetchLoading] = useState(false);
+  const [sheetsUrl, setSheetsUrl] = useState('');
+  const [sheetsLoading, setSheetsLoading] = useState(false);
+  const [sheetsMsg, setSheetsMsg] = useState('');
   const [secMalId, setSecMalId] = useState<Record<string, string>>({});
   const [secMalLoading, setSecMalLoading] = useState<Record<string, boolean>>({});
 
@@ -69,6 +170,28 @@ const AddEpisodePage = () => {
       setSeasonSections([newSeasonSection(defaultSeason)]);
     });
   }, [isLoading, animeId]);
+
+  const handleImportSheets = async () => {
+    const sheetId = extractSheetId(sheetsUrl.trim());
+    if (!sheetId) { setSheetsMsg('Hata: Geçerli bir Google Sheets linki değil.'); return; }
+    setSheetsLoading(true);
+    setSheetsMsg('');
+    try {
+      const csvUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:csv`;
+      const res = await fetch(csvUrl);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const text = await res.text();
+      const sections = sheetCsvToSeasonSections(text);
+      if (!sections.length) { setSheetsMsg('Hata: Tabloda uygun veri bulunamadı.'); return; }
+      setSeasonSections(sections);
+      const totalEps = sections.reduce((t, s) => t + s.episodes.length, 0);
+      setSheetsMsg(`${sections.length} sezon, ${totalEps} bölüm başarıyla içe aktarıldı!`);
+    } catch (e: any) {
+      setSheetsMsg('Hata: ' + (e.message || 'Tablo çekilemedi. Tablonun herkese açık olduğundan emin ol.'));
+    } finally {
+      setSheetsLoading(false);
+    }
+  };
 
   const handleFetchAllSeasons = async () => {
     const id = parseInt(anilistId.trim());
@@ -277,6 +400,41 @@ const AddEpisodePage = () => {
             })}
           </div>
         )}
+
+        {/* Google Sheets Import */}
+        <div className="bg-gray-900/50 border border-green-900/40 rounded-xl p-3 space-y-2">
+          <p className="text-xs text-gray-500 font-bold uppercase flex items-center gap-1.5">
+            <FileSpreadsheet size={12} className="text-green-400" /> Google Sheets'ten İçe Aktar
+          </p>
+          <div className="flex gap-2">
+            <input
+              type="url"
+              placeholder="https://docs.google.com/spreadsheets/d/..."
+              value={sheetsUrl}
+              onChange={e => setSheetsUrl(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), handleImportSheets())}
+              className="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:border-green-500 focus:outline-none"
+            />
+            <button
+              type="button"
+              onClick={handleImportSheets}
+              disabled={sheetsLoading || !sheetsUrl.trim()}
+              className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-500 disabled:opacity-50 text-white font-bold text-sm rounded-lg transition-colors flex-shrink-0"
+            >
+              {sheetsLoading ? <Loader2 size={14} className="animate-spin" /> : <FileSpreadsheet size={14} />}
+              Aktar
+            </button>
+          </div>
+          <p className="text-xs text-gray-600">
+            Sütun sırası: Anime, Sezon, Bölüm, Bölüm Adı, Çevirmen, Dil (tr/en), Oynatıcı, Embed Link
+            &nbsp;—&nbsp;Aynı oynatıcıda TR+EN varsa sadece TR alınır.
+          </p>
+          {sheetsMsg && (
+            <p className={`text-xs font-medium ${sheetsMsg.startsWith('Hata') ? 'text-red-400' : 'text-green-400'}`}>
+              {sheetsMsg}
+            </p>
+          )}
+        </div>
 
         {/* MAL / AniList Fetch */}
         <div className="bg-gray-900/50 border border-gray-800 rounded-xl p-3 space-y-2">
